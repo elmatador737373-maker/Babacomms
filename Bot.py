@@ -2,11 +2,28 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
+from flask import Flask
+from threading import Thread
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 # --- CONFIGURAZIONE RUOLI AUTORIZZATI ---
 AUTHORIZED_ROLE_IDS = [1497868039234781316, 1455297931799298191]
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run():
+    # Prende la porta da Render o usa la 8080
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
 
 class MyBot(commands.Bot):
     def __init__(self):
@@ -68,6 +85,8 @@ async def partnership(
     await interaction.response.send_message("✅ Partnership inviata!", ephemeral=True)
 
 if TOKEN:
+    keep_alive()  # <--- Fa partire il web server
     bot.run(TOKEN)
 else:
-    print("ERRORE: Variabile DISCORD_TOKEN non trovata!")
+    print("ERRORE: Variabile DISCORD_TOKEN mancante!")
+
