@@ -1,65 +1,68 @@
 import discord
-import json
-import asyncio
+from discord import app_commands
+from discord.ext import commands
+import os
 
-# Caricamento dei dati dal file JSON
-with open('babajaga_community_full_vocal.json', 'r', encoding='utf-8') as f:
-    data = json.load(f)
+# Legge il token dal Secret Environment di Render
+TOKEN = os.getenv('DISCORD_TOKEN')
 
-intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True  # Necessario per gestire i ruoli
-client = discord.Client(intents=intents)
+# Inserisci qui i due ID autorizzati
+AUTHORIZED_IDS = [1497868039234781316, 1455297931799298191] 
 
-@client.event
+class MyBot(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.members = True 
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        await self.tree.sync()
+
+bot = MyBot()
+
+@bot.event
 async def on_ready():
-    print(f'Loggato come {client.user}')
-    
-    # Sostituisci con l'ID del tuo server di test
-    guild_id = int(input("Inserisci l'ID del server dove vuoi importare la struttura: "))
-    guild = client.get_guild(guild_id)
+    print(f'Bot online come {bot.user}')
 
-    if not guild:
-        print("Server non trovato. Assicurati che il bot sia dentro!")
+@bot.tree.command(name="partnership", description="Crea un annuncio di partnership")
+@app_commands.describe(
+    descrizione="La descrizione del server partner",
+    manager="Seleziona il manager partner",
+    ping="Inserisci il ping (es. everyone o here)"
+)
+async def partnership(
+    interaction: discord.Interaction, 
+    descrizione: str, 
+    manager: discord.Member, 
+    ping: str
+):
+    # Controllo se l'utente è tra i due autorizzati
+    if interaction.user.id not in AUTHORIZED_IDS:
+        await interaction.response.send_message("❌ Non hai il permesso di usare questo bot.", ephemeral=True)
         return
 
-    print(f"Inizio creazione struttura su: {guild.name}")
+    # Formattazione automatica del ping
+    final_ping = ping if ping.startswith('@') else f"@{ping}"
+    
+    emoji_ds = "🇮🇹" 
+    
+    # Costruzione del messaggio stile immagine (senza limoni)
+    testo_partnership = (
+        f"{final_ping}\n\n"
+        f"{emoji_ds} **NUOVA PARTNERSHIP** {emoji_ds}\n\n"
+        f"{descrizione}\n\n"
+        f"**---------------------------------**\n"
+        f"👤 **Author:** {interaction.user.mention}\n"
+        f"🚀 **Server:** 🇮🇹 **{interaction.guild.name}** 🇮🇹\n"
+        f"🥰 **Manager:** {manager.mention}\n"
+        f" @ **Ping:** {final_ping}\n"
+        f"**---------------------------------**"
+    )
 
-    # 1. Creazione Ruoli
-    role_map = {}
-    for role_data in reversed(data['roles']): # Reversed per mantenere la gerarchia corretta
-        color = discord.Color(role_data['color'])
-        permissions = discord.Permissions()
-        
-        # Mapping base dei permessi (semplificato)
-        if "ADMINISTRATOR" in role_data['permissions']:
-            permissions.administrator = True
-            
-        new_role = await guild.create_role(
-            name=role_data['name'],
-            color=color,
-            hoist=role_data['hoist'],
-            mentionable=role_data['mentionable'],
-            permissions=permissions
-        )
-        print(f"Creato ruolo: {new_role.name}")
-        role_map[role_data['name']] = new_role
+    # Invia il messaggio nel canale
+    await interaction.channel.send(testo_partnership)
+    
+    # Risposta di conferma (solo tu la vedi)
+    await interaction.response.send_message("✅ Messaggio inviato!", ephemeral=True)
 
-    # 2. Creazione Categorie e Canali
-    for cat_data in data['categories']:
-        category = await guild.create_category(cat_data['name'])
-        print(f"Creato categoria: {category.name}")
-        
-        for channel_name in cat_data['channels']:
-            # Se il nome contiene icone di volume o nomi tipici, crea canale vocale
-            if "Voice" in channel_name or "Room" in channel_name or "🔊" in channel_name:
-                await guild.create_voice_channel(channel_name, category=category)
-            else:
-                await guild.create_text_channel(channel_name, category=category)
-            print(f"  - Creato canale: {channel_name}")
-
-    print("\n✅ Importazione completata con successo!")
-    await client.close()
-
-client.run('IL_TUO_TOKEN_QUI')
-
+bot.run(TOKEN)
