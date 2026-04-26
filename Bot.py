@@ -44,10 +44,17 @@ async def partnership(
         await interaction.response.send_message("❌ Non hai un ruolo autorizzato per usare questo comando.", ephemeral=True)
         return
 
-    # Messaggio finale senza automatismi sul ping
+    # --- RICERCA EMOJI PERSONALIZZATA ---
+    # Cerca l'emoji nel server che si chiama "dsitalia"
+    custom_emoji = discord.utils.get(interaction.guild.emojis, name="dsitalia")
+    
+    # Se la trova usa quella, altrimenti usa la bandiera come backup
+    emoji_display = str(custom_emoji) if custom_emoji else "🇮🇹"
+
+    # Messaggio finale
     testo_partnership = (
         f"{ping}\n\n"
-        f"🇮🇹 **NUOVA PARTNERSHIP** 🇮🇹\n\n"
+        f"{emoji_display} **NUOVA PARTNERSHIP** {emoji_display}\n\n"
         f"{descrizione}\n\n"
         f"**---------------------------------**\n"
         f"👤 **Author:** {interaction.user.mention}\n"
@@ -57,10 +64,7 @@ async def partnership(
         f"**---------------------------------**"
     )
 
-    # Invio nel canale
     await interaction.channel.send(testo_partnership)
-    
-    # Risposta silenziosa di conferma
     await interaction.response.send_message("✅ Partnership inviata!", ephemeral=True)
 
 if TOKEN:
