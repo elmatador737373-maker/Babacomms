@@ -3,16 +3,17 @@ from discord import app_commands
 from discord.ext import commands
 import os
 
-# Legge il token dal Secret Environment di Render
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-# Inserisci qui i due ID autorizzati
-AUTHORIZED_IDS = [1497868039234781316, 1455297931799298191] 
+# --- CONFIGURAZIONE RUOLI AUTORIZZATI ---
+# Ho inserito gli ID che mi hai fornito
+AUTHORIZED_ROLE_IDS = [1497868039234781316, 1455297931799298191]
 
 class MyBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True 
+        intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
@@ -22,13 +23,13 @@ bot = MyBot()
 
 @bot.event
 async def on_ready():
-    print(f'Bot online come {bot.user}')
+    print(f'✅ Bot online come {bot.user}')
 
 @bot.tree.command(name="partnership", description="Crea un annuncio di partnership")
 @app_commands.describe(
     descrizione="La descrizione del server partner",
     manager="Seleziona il manager partner",
-    ping="Inserisci il ping (es. everyone o here)"
+    ping="Inserisci il ping (es. @everyone)"
 )
 async def partnership(
     interaction: discord.Interaction, 
@@ -36,20 +37,23 @@ async def partnership(
     manager: discord.Member, 
     ping: str
 ):
-    # Controllo se l'utente è tra i due autorizzati
-    if interaction.user.id not in AUTHORIZED_IDS:
-        await interaction.response.send_message("❌ Non hai il permesso di usare questo bot.", ephemeral=True)
+    # Controllo se l'utente ha almeno uno dei ruoli autorizzati
+    # interaction.user.roles è la lista di tutti i ruoli dell'utente
+    user_role_ids = [role.id for role in interaction.user.roles]
+    
+    # Verifichiamo se c'è un'intersezione tra i ruoli dell'utente e quelli autorizzati
+    authorized = any(role_id in AUTHORIZED_ROLE_IDS for role_id in user_role_ids)
+
+    if not authorized:
+        await interaction.response.send_message("❌ Non hai un ruolo autorizzato per usare questo comando.", ephemeral=True)
         return
 
     # Formattazione automatica del ping
     final_ping = ping if ping.startswith('@') else f"@{ping}"
     
-    emoji_ds = "🇮🇹" 
-    
-    # Costruzione del messaggio stile immagine (senza limoni)
     testo_partnership = (
         f"{final_ping}\n\n"
-        f"{emoji_ds} **NUOVA PARTNERSHIP** {emoji_ds}\n\n"
+        f"🇮🇹 **NUOVA PARTNERSHIP** 🇮🇹\n\n"
         f"{descrizione}\n\n"
         f"**---------------------------------**\n"
         f"👤 **Author:** {interaction.user.mention}\n"
@@ -59,10 +63,10 @@ async def partnership(
         f"**---------------------------------**"
     )
 
-    # Invia il messaggio nel canale
     await interaction.channel.send(testo_partnership)
-    
-    # Risposta di conferma (solo tu la vedi)
-    await interaction.response.send_message("✅ Messaggio inviato!", ephemeral=True)
+    await interaction.response.send_message("✅ Partnership inviata correttamente!", ephemeral=True)
 
-bot.run(TOKEN)
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("ERRORE: Variabile DISCORD_TOKEN non trovata!")
