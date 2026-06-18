@@ -22,7 +22,6 @@
         .blur-bg {
             backdrop-filter: blur(16px);
         }
-        /* Effetto sfumatura oro premium */
         .text-gold {
             background: linear-gradient(135deg, #ffe082 0%, #ffb300 50%, #c69500 100%);
             -webkit-background-clip: text;
@@ -34,10 +33,6 @@
         .bg-gold-hover:hover {
             background: linear-gradient(135deg, #ffe082 0%, #ffb300 100%);
         }
-        .border-gold {
-            border-color: #ffb300;
-        }
-        /* Animazione bagliore oro per elementi VIP */
         .gold-glow {
             box-shadow: 0 0 20px rgba(255, 179, 0, 0.15);
         }
@@ -61,13 +56,12 @@
                 </div>
                 
                 <div class="hidden md:flex items-center gap-8 text-sm font-semibold tracking-wide">
-                    <a href="#shop-section" class="text-gray-300 hover:text-amber-400 transition">SHOP PACKS</a>
-                    <a href="https://discord.gg/vinewoodrpv3" target="_blank" class="text-gray-300 hover:text-[#5865F2] transition flex items-center gap-1.5"><i class="fab fa-discord"></i> DISCORD</a>
+                    <a href="#shop-section" class="text-gray-300 hover:text-amber-400 transition" onclick="showSection('shop')">SHOP PACKS</a>
+                    <a href="https://discord.gg/AEWw6RCvDh" target="_blank" class="text-gray-300 hover:text-[#5865F2] transition flex items-center gap-1.5"><i class="fab fa-discord"></i> DISCORD</a>
                 </div>
 
                 <div class="flex items-center gap-4 z-10">
-                    <div id="auth-buttons" class="flex items-center gap-3">
-                        </div>
+                    <div id="auth-buttons" class="flex items-center gap-3"></div>
                 </div>
             </div>
         </div>
@@ -85,8 +79,7 @@
             Benvenuto nello store ufficiale. Acquista i vantaggi esclusivi, veicoli VIP e risorse per dominare la città. Consegna automatica tramite Ticket Discord.
         </p>
 
-        <div id="quick-hero-auth" class="pt-4 flex flex-col sm:flex-row justify-center items-center gap-4 max-w-md mx-auto">
-            </div>
+        <div id="quick-hero-auth" class="pt-4 flex flex-col sm:flex-row justify-center items-center gap-4 max-w-md mx-auto"></div>
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full z-10 relative">
@@ -116,14 +109,14 @@
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Nickname PSN / Discord</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="far fa-user"></i></span>
-                        <input type="text" id="auth-username" required class="w-full bg-gray-900/50 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium text-sm">
+                        <input type="text" id="auth-username" required class="w-full bg-gray-900/50 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                     </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Password di Sicurezza</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span>
-                        <input type="password" id="auth-password" required class="w-full bg-gray-900/50 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium text-sm">
+                        <input type="password" id="auth-password" required class="w-full bg-gray-900/50 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                     </div>
                 </div>
                 <button type="submit" class="w-full bg-gold bg-gold-hover text-gray-950 font-bold py-3.5 rounded-xl transition shadow-lg shadow-amber-500/10 uppercase tracking-wider text-sm cursor-pointer font-bold">Conferma e Procedi</button>
@@ -146,56 +139,72 @@
                         <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-sliders text-amber-500 mr-2"></i>Impostazioni Sito</h3>
                         <form id="settings-form" class="space-y-4">
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Nome Server / Testo Logo</label>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Nome Server</label>
                                 <input type="text" id="settings-site-name" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">URL Immagine Logo (.png / .jpg)</label>
-                                <input type="url" id="settings-logo-url" placeholder="https://link.com/logo.png" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">URL Immagine Logo</label>
+                                <input type="url" id="settings-logo-url" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <button type="submit" class="w-full bg-gold text-gray-950 font-bold py-2.5 rounded-lg text-sm transition uppercase tracking-wide cursor-pointer">Salva Impostazioni</button>
                         </form>
                     </div>
 
                     <div class="bg-gray-950/80 border border-gray-900 rounded-xl p-6 space-y-4">
-                        <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-box-open text-amber-500 mr-2"></i>Aggiungi Nuovo Pacchetto</h3>
+                        <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-box-open text-amber-500 mr-2"></i>Aggiungi Pacchetto</h3>
                         <form id="pack-form" class="space-y-4">
                             <div>
                                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Nome Pacchetto</label>
                                 <input type="text" id="pack-name" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Prezzo di Vendita (€)</label>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Prezzo (€)</label>
                                 <input type="number" step="0.01" id="pack-price" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">URL Immagine Copertina</label>
-                                <input type="url" id="pack-image" placeholder="https://unsplash.com/foto.png" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">URL Immagine</label>
+                                <input type="url" id="pack-image" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Descrizione Benefici e Contenuti</label>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Descrizione Benefici</label>
                                 <textarea id="pack-desc" rows="3" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium"></textarea>
                             </div>
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-sm transition uppercase tracking-wide cursor-pointer">Pubblica nello Shop</button>
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-sm transition uppercase tracking-wide cursor-pointer">Pubblica Shop</button>
                         </form>
                     </div>
                 </div>
 
-                <div class="lg:col-span-2 bg-gray-950/80 border border-gray-900 rounded-xl p-6 space-y-4">
-                    <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-users text-amber-500 mr-2"></i>Gestione Permessi Cittadini</h3>
-                    <p class="text-xs text-gray-400">Database utenti registrati su Supabase. Usa il tasto azione per promuovere ad amministratore o revocare i permessi.</p>
-                    <div class="overflow-x-auto rounded-lg border border-gray-900">
-                        <table class="w-full text-left text-xs text-gray-400">
-                            <thead class="bg-gray-900 text-gray-300 uppercase font-bold tracking-wider">
-                                <tr>
-                                    <th class="px-4 py-3.5">Nome Utente</th>
-                                    <th class="px-4 py-3.5">Grado Account</th>
-                                    <th class="px-4 py-3.5 text-right">Azioni Staff</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table-body" class="divide-y divide-gray-900">
-                                </tbody>
-                        </table>
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-gray-950/80 border border-gray-900 rounded-xl p-6 space-y-4">
+                        <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-edit text-amber-500 mr-2"></i>Gestisci Pack nello Shop</h3>
+                        <div class="overflow-x-auto rounded-lg border border-gray-900">
+                            <table class="w-full text-left text-xs text-gray-400">
+                                <thead class="bg-gray-900 text-gray-300 uppercase font-bold tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3.5">Nome Pack</th>
+                                        <th class="px-4 py-3.5">Prezzo</th>
+                                        <th class="px-4 py-3.5 text-right">Azioni Modifica/Elimina</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-packs-table-body" class="divide-y divide-gray-900"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-950/80 border border-gray-900 rounded-xl p-6 space-y-4">
+                        <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-users text-amber-500 mr-2"></i>Gestione Permessi Cittadini</h3>
+                        <div class="overflow-x-auto rounded-lg border border-gray-900">
+                            <table class="w-full text-left text-xs text-gray-400">
+                                <thead class="bg-gray-900 text-gray-300 uppercase font-bold tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3.5">Nome Utente</th>
+                                        <th class="px-4 py-3.5">Grado Account</th>
+                                        <th class="px-4 py-3.5 text-right">Azioni Staff</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body" class="divide-y divide-gray-900"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -209,14 +218,14 @@
             </div>
             <div class="space-y-1">
                 <h3 class="heading-font text-2xl font-bold uppercase tracking-wide text-white">Ordine Ricevuto!</h3>
-                <p class="text-sm text-gray-400">Per completare la transazione del pacchetto ed ottenerlo su PS4, esegui il checkout sul nostro canale dedicato.</p>
+                <p class="text-sm text-gray-400">Per completare la transazione del pacchetto ed ottenerlo su PS4, clicca il pulsante sotto per aprire un ticket nel nostro server Discord.</p>
             </div>
             <div class="bg-gray-900 p-3.5 rounded-xl border border-gray-800 text-sm font-mono text-amber-400 break-all select-all flex items-center justify-center gap-2">
-                <i class="fab fa-discord text-xs text-gray-500"></i> https://discord.gg/vinewoodrpv3
+                <i class="fab fa-discord text-xs text-gray-500"></i> https://discord.gg/AEWw6RCvDh
             </div>
             <div class="flex gap-3 pt-1">
                 <button onclick="closeModal()" class="w-1/2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-white font-semibold py-2.5 rounded-xl transition text-sm cursor-pointer">Chiudi</button>
-                <a href="https://discord.gg/vinewoodrpv3" target="_blank" class="w-1/2 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
+                <a href="https://discord.gg/AEWw6RCvDh" target="_blank" class="w-1/2 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
                     Apri Ticket <i class="fas fa-external-link-alt text-xs"></i>
                 </a>
             </div>
@@ -224,30 +233,28 @@
     </div>
 
     <footer class="border-t border-gray-900 bg-gray-950/80 py-8 text-center text-xs text-gray-500 tracking-wide">
-        <p class="max-w-2xl mx-auto px-4">&copy; 2026 <span id="footer-site-name" class="text-gray-300 font-semibold">Vinewood RP V3</span>. Tutti i diritti riservati. Questo portale indipendente non è affiliato o approvato da Sony Interactive Entertainment o Rockstar Games.</p>
+        <p class="max-w-2xl mx-auto px-4">&copy; 2026 <span id="footer-site-name" class="text-gray-300 font-semibold">Vinewood RP V3</span>. Tutti i diritti riservati.</p>
     </footer>
 
     <script>
-        // CONFIGURAZIONE CREDENZIALI FORNITE (INSERITE DIRETTAMENTE)
         const SUPABASE_URL = "https://gfrarmsqvchrzsqxalpb.supabase.co"; 
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmcmFybXNxdmNocnpzcXhhbHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3Nzg2NjUsImV4cCI6MjA5NzM1NDY2NX0.xqd0ymiMVKFpEGWg3tAzT1SMq6aTNOV2N8bjvzTNcB0";
 
-        // Inizializzazione client Supabase
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        let currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || null;
+        // ABILITAZIONE ACCESSO PERMANENTE (Uso di localStorage al posto di sessionStorage)
+        let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
         let isRegisterMode = false;
 
-        // Funzione di avvio complessivo dell'app
         async function init() {
             await renderSiteIdentity();
             renderAuthButtons();
             renderHeroAuthZone();
             await renderPacks();
             await renderUsersTable();
+            await renderAdminPacksTable();
         }
 
-        // 1. Rendering dinamico Identità del Sito (Logo / Titoli)
         async function renderSiteIdentity() {
             try {
                 const { data, error } = await supabaseClient.from('site_settings').select('*').eq('id', 1).single();
@@ -266,27 +273,17 @@
                         container.innerHTML = `<span class="heading-font text-2xl font-black tracking-wider text-gold uppercase">${data.name}</span>`;
                     }
                 }
-            } catch (err) {
-                console.error("Errore nel caricamento del logo:", err);
-            }
+            } catch (err) { console.error(err); }
         }
 
-        // 2. Modifica Logo e Titolo da Admin
         document.getElementById('settings-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('settings-site-name').value.trim() || "VINEWOOD RP V3";
             const logo_url = document.getElementById('settings-logo-url').value.trim();
-
             const { error } = await supabaseClient.from('site_settings').update({ name, logo_url }).eq('id', 1);
-            if (error) {
-                alert("Errore nel salvataggio su database cloud: " + error.message);
-            } else {
-                await renderSiteIdentity();
-                alert("Identità del server e Logo modificati con successo!");
-            }
+            if (!error) { await renderSiteIdentity(); alert("Identità salvata!"); }
         });
 
-        // 3. Render pulsanti di autenticazione nella NAVBAR alta
         function renderAuthButtons() {
             const container = document.getElementById('auth-buttons');
             if (currentUser) {
@@ -303,7 +300,6 @@
             }
         }
 
-        // 4. RENDERING ZONA AUTH IN HERO (Visibilità immediata garantita all'utente appena entra)
         function renderHeroAuthZone() {
             const container = document.getElementById('quick-hero-auth');
             if (currentUser) {
@@ -312,11 +308,11 @@
                         <div class="flex items-center gap-3 text-left">
                             <div class="w-9 h-9 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold"><i class="far fa-user"></i></div>
                             <div>
-                                <h4 class="text-xs text-gray-500 uppercase font-bold tracking-wider">Sessione Attiva</h4>
+                                <h4 class="text-xs text-gray-500 uppercase font-bold tracking-wider">Bentornato in città</h4>
                                 <p class="text-sm font-bold text-white">${currentUser.username}</p>
                             </div>
                         </div>
-                        <a href="#shop-section" class="bg-gold text-gray-950 font-bold px-4 py-2 rounded-lg text-xs uppercase tracking-wider transition">Esplora i Pack <i class="fas fa-arrow-down ml-1"></i></a>
+                        <a href="#shop-section" class="bg-gold text-gray-950 font-bold px-4 py-2 rounded-lg text-xs uppercase tracking-wider transition">Vedi i Pack <i class="fas fa-arrow-down ml-1"></i></a>
                     </div>
                 `;
             } else {
@@ -331,7 +327,6 @@
             }
         }
 
-        // 5. Cambio di sezione fluido (Single Page Application)
         function showSection(section) {
             document.getElementById('shop-section').classList.add('hidden');
             document.getElementById('auth-section').classList.add('hidden');
@@ -343,12 +338,10 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // 6. Render della Griglia dei Pacchetti VIP presi dal Cloud
         async function renderPacks() {
             const grid = document.getElementById('packs-grid');
             try {
                 const { data: packsArray, error } = await supabaseClient.from('packs').select('*').order('created_at', { ascending: true });
-                
                 grid.innerHTML = '';
                 if (packsArray && packsArray.length > 0) {
                     packsArray.forEach(pack => {
@@ -366,9 +359,8 @@
                                     <div class="flex items-center justify-between pt-2 border-t border-gray-900/60">
                                         <div class="flex flex-col">
                                             <span class="text-2xl font-black heading-font text-gold">${pack.price} €</span>
-                                            <span class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Tasse incluse</span>
                                         </div>
-                                        <button onclick="buyPack()" class="bg-gold bg-gold-hover text-gray-950 font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/5 flex items-center gap-2 cursor-pointer">
+                                        <button onclick="buyPack()" class="bg-gold bg-gold-hover text-gray-950 font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition cursor-pointer">
                                             <i class="fas fa-shopping-cart text-[10px]"></i> Acquista
                                         </button>
                                     </div>
@@ -376,23 +368,86 @@
                             </div>
                         `;
                     });
-                } else {
-                    grid.innerHTML = `<div class="col-span-full text-center py-8 text-gray-500 font-medium">Nessun pacchetto inserito nello shop al momento.</div>`;
+                } else { grid.innerHTML = `<div class="col-span-full text-center py-8 text-gray-500 font-medium">Nessun pacchetto inserito.</div>`; }
+            } catch (err) { console.error(err); }
+        }
+
+        // AGGIUNTA: RENDERING TABELLA DI MODIFICA/ELIMINAZIONE PACK PER ADMIN
+        async function renderAdminPacksTable() {
+            const tbody = document.getElementById('admin-packs-table-body');
+            if (!currentUser || !currentUser.is_admin) return;
+            try {
+                const { data: packs, error } = await supabaseClient.from('packs').select('*').order('created_at', { ascending: true });
+                tbody.innerHTML = '';
+                if (packs) {
+                    packs.forEach(pack => {
+                        tbody.innerHTML += `
+                            <tr class="border-b border-gray-900 hover:bg-gray-900/20 transition text-sm">
+                                <td class="px-4 py-3.5 font-bold text-gray-200 tracking-wide">${pack.name}</td>
+                                <td class="px-4 py-3.5 text-amber-400 font-bold">${pack.price} €</td>
+                                <td class="px-4 py-3.5 text-right space-x-2">
+                                    <button onclick="modificaPack('${pack.id}', '${pack.name}', ${pack.price}, '${pack.description.replace(/'/g, "\\'")}', '${pack.image}')" class="text-xs p-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-amber-400 border border-gray-800 transition cursor-pointer" title="Modifica">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button onclick="eliminaPack('${pack.id}')" class="text-xs p-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-rose-400 border border-gray-800 transition cursor-pointer" title="Elimina">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
                 }
-            } catch (err) {
-                grid.innerHTML = `<div class="col-span-full text-center py-8 text-rose-500 font-medium">Errore nel caricamento dei dati da Supabase.</div>`;
+            } catch (err) { console.error(err); }
+        }
+
+        // AZIONE: ELIMINA UN PACCHETTO DA SUPABASE
+        async function eliminaPack(packId) {
+            if (confirm("Sei sicuro di voler eliminare definitivamente questo pacchetto dallo shop?")) {
+                const { error } = await supabaseClient.from('packs').delete().eq('id', packId);
+                if (!error) {
+                    alert("Pacchetto rimosso con successo!");
+                    await renderPacks();
+                    await renderAdminPacksTable();
+                } else { alert("Errore: " + error.message); }
             }
         }
 
-        // 7. Render della Tabella Utenti per gli Amministratori
+        // AZIONE: MODIFICA UN PACCHETTO SU SUPABASE
+        async function modificaPack(packId, oldName, oldPrice, oldDesc, oldImage) {
+            const newName = prompt("Inserisci il nuovo nome del pacchetto:", oldName);
+            if (newName === null) return;
+            const newPrice = prompt("Inserisci il nuovo prezzo (€):", oldPrice);
+            if (newPrice === null) return;
+            const newDesc = prompt("Inserisci la nuova descrizione:", oldDesc);
+            if (newDesc === null) return;
+            const newImage = prompt("Inserisci l'URL della nuova immagine di copertina:", oldImage);
+            if (newImage === null) return;
+
+            if (newName.trim() === "" || newPrice.trim() === "") {
+                alert("Campi non validi!");
+                return;
+            }
+
+            const { error } = await supabaseClient.from('packs').update({
+                name: newName,
+                price: parseFloat(newPrice).toFixed(2),
+                description: newDesc,
+                image: newImage
+            }).eq('id', packId);
+
+            if (!error) {
+                alert("Pacchetto aggiornato con successo!");
+                await renderPacks();
+                await renderAdminPacksTable();
+            } else { alert("Errore durante la modifica: " + error.message); }
+        }
+
         async function renderUsersTable() {
             const tbody = document.getElementById('users-table-body');
             if (!currentUser || !currentUser.is_admin) return;
-
             try {
                 const { data: users, error } = await supabaseClient.from('users').select('*').order('username', { ascending: true });
                 tbody.innerHTML = '';
-
                 if (users) {
                     users.forEach(user => {
                         tbody.innerHTML += `
@@ -404,7 +459,7 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3.5 text-right">
-                                    <button onclick="toggleAdmin('${user.id}', ${user.is_admin})" class="text-xs p-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-800 transition cursor-pointer" title="Modifica Grado Utente">
+                                    <button onclick="toggleAdmin('${user.id}', ${user.is_admin})" class="text-xs p-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-800 transition cursor-pointer">
                                         <i class="fas ${user.is_admin ? 'fa-user-minus text-rose-400' : 'fa-user-plus text-emerald-400'}"></i>
                                     </button>
                                 </td>
@@ -412,12 +467,9 @@
                         `;
                     });
                 }
-            } catch (err) {
-                console.error("Errore nel caricamento della tabella utenti:", err);
-            }
+            } catch (err) { console.error(err); }
         }
 
-        // 8. Gestione Apertura Finestra Autenticazione
         function openAuth(register = false) {
             isRegisterMode = register;
             document.getElementById('auth-title').innerText = register ? "Crea un nuovo account" : "Accedi al Portale";
@@ -428,7 +480,6 @@
 
         document.getElementById('auth-switch-btn').addEventListener('click', () => openAuth(!isRegisterMode));
 
-        // 9. Login e Registrazione integrati con Supabase
         document.getElementById('auth-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const userIn = document.getElementById('auth-username').value.trim();
@@ -436,22 +487,20 @@
 
             if (isRegisterMode) {
                 const { data, error } = await supabaseClient.from('users').insert([{ username: userIn, password: passIn }]).select();
-                if (error) {
-                    alert("Errore nella registrazione. Il nickname potrebbe essere già registrato da un altro giocatore.");
-                } else {
+                if (error) { alert("Errore. Nickname già in uso."); } 
+                else {
                     currentUser = data[0];
-                    sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    alert("Registrazione completata con successo! Benvenuto in città.");
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    alert("Benvenuto in città!");
                     await init();
                     showSection('shop');
                 }
             } else {
                 const { data, error } = await supabaseClient.from('users').select('*').eq('username', userIn).eq('password', passIn).maybeSingle();
-                if (error || !data) {
-                    alert("Credenziali errate o account non esistente. Riprova.");
-                } else {
+                if (error || !data) { alert("Credenziali errate!"); } 
+                else {
                     currentUser = data;
-                    sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     await init();
                     showSection('shop');
                 }
@@ -459,29 +508,24 @@
             document.getElementById('auth-form').reset();
         });
 
-        // 10. Logout utente
         function logout() {
             currentUser = null;
-            sessionStorage.removeItem('currentUser');
+            localStorage.removeItem('currentUser');
             init();
             showSection('shop');
         }
 
-        // 11. Promozione / Revoca amministratore su database cloud
         async function toggleAdmin(userId, currentStatus) {
             const { error } = await supabaseClient.from('users').update({ is_admin: !currentStatus }).eq('id', userId);
             if (!error) {
                 if (currentUser && currentUser.id === userId) {
                     currentUser.is_admin = !currentStatus;
-                    sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
                 }
                 await init();
-            } else {
-                alert("Errore nel cambio permessi: " + error.message);
             }
         }
 
-        // 12. Creazione Nuovi Pack inviati a Supabase
         document.getElementById('pack-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('pack-name').value;
@@ -493,20 +537,13 @@
             if (!error) {
                 document.getElementById('pack-form').reset();
                 await renderPacks();
-                alert("Pacchetto aggiunto con successo al database di Supabase!");
-            } else {
-                alert("Errore nell'inserimento del pacchetto: " + error.message);
+                await renderAdminPacksTable();
+                alert("Pacchetto aggiunto!");
             }
         });
 
-        // 13. Modale Checkout
-        function buyPack() {
-            document.getElementById('purchase-modal').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('purchase-modal').classList.add('hidden');
-        }
+        function buyPack() { document.getElementById('purchase-modal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('purchase-modal').classList.add('hidden'); }
 
         init();
     </script>
