@@ -3,129 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vinewood RP V3 - Pack Shop</title>
+    <title>Vinewood RP V3 - Official Shop</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght=500;600;700;800&family=Plus+Jakarta+Sans:wght=400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
-            background-color: #0b0f19;
+            background-color: #060913;
             color: #f3f4f6;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .heading-font {
+            font-family: 'Rajdhani', sans-serif;
         }
         .blur-bg {
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
+        }
+        /* Effetto sfumatura oro premium */
+        .text-gold {
+            background: linear-gradient(135deg, #ffe082 0%, #ffb300 50%, #c69500 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .bg-gold {
+            background: linear-gradient(135deg, #ffb300 0%, #c69500 100%);
+        }
+        .bg-gold-hover:hover {
+            background: linear-gradient(135deg, #ffe082 0%, #ffb300 100%);
+        }
+        .border-gold {
+            border-color: #ffb300;
+        }
+        /* Animazione bagliore oro per elementi VIP */
+        .gold-glow {
+            box-shadow: 0 0 20px rgba(255, 179, 0, 0.15);
+        }
+        .gold-glow-hover:hover {
+            box-shadow: 0 0 30px rgba(255, 179, 0, 0.3);
+            border-color: #ffb300;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between">
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
 
-    <nav class="border-b border-gray-800 bg-gray-950/80 sticky top-0 z-50 blur-bg">
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[350px] bg-amber-500/10 blur-[150px] pointer-events-none z-0"></div>
+
+    <nav class="border-b border-gray-900 bg-gray-950/70 sticky top-0 z-50 blur-bg backdrop-blur-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
+            <div class="flex items-center justify-between h-20">
                 <div class="flex items-center gap-3">
-                    <div id="site-logo-container" class="flex items-center gap-2">
-                        <span id="site-text-logo" class="text-xl font-black tracking-wider text-amber-500">VINEWOOD RP V3</span>
+                    <div id="site-logo-container" class="flex items-center gap-3">
+                        <span id="site-text-logo" class="heading-font text-2xl font-extrabold tracking-wider text-gold">VINEWOOD RP V3</span>
                     </div>
                 </div>
-                <div class="flex items-center gap-4">
-                    <a href="https://discord.gg/vinewoodrpv3" target="_blank" class="bg-[#5865F2] hover:bg-[#4752C4] text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
-                        <i class="fab fa-discord"></i> Discord Server
-                    </a>
-                    <div id="auth-buttons" class="flex gap-2"></div>
+                
+                <div class="hidden md:flex items-center gap-8 text-sm font-semibold tracking-wide">
+                    <a href="#shop-section" class="text-gray-300 hover:text-amber-400 transition">SHOP PACKS</a>
+                    <a href="https://discord.gg/vinewoodrpv3" target="_blank" class="text-gray-300 hover:text-[#5865F2] transition flex items-center gap-1.5"><i class="fab fa-discord"></i> DISCORD</a>
+                </div>
+
+                <div class="flex items-center gap-4 z-10">
+                    <div id="auth-buttons" class="flex items-center gap-3">
+                        </div>
                 </div>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
-        
-        <div id="shop-section" class="space-y-8">
-            <div class="text-center max-w-2xl mx-auto space-y-3">
-                <h1 class="text-4xl font-extrabold text-white sm:text-5xl">Potenzia la tua esperienza su <span class="text-amber-500">PS4</span></h1>
-                <p class="text-gray-400 text-lg">Acquista i migliori pack esclusivi per Vinewood RP. Consegna rapida tramite ticket Discord.</p>
+    <header class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8 text-center space-y-6 z-10">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
+            <i class="fas fa-sparkles"></i> Server Ps4 Roleplay Premium
+        </div>
+        <h1 class="heading-font text-5xl sm:text-6xl font-black tracking-tight text-white uppercase">
+            Potenzia il tuo Gioco su <br class="sm:hidden">
+            <span class="text-gold">Vinewood RP V3</span>
+        </h1>
+        <p class="max-w-2xl mx-auto text-gray-400 text-base sm:text-lg font-medium leading-relaxed">
+            Benvenuto nello store ufficiale. Acquista i vantaggi esclusivi, veicoli VIP e risorse per dominare la città. Consegna automatica tramite Ticket Discord.
+        </p>
+
+        <div id="quick-hero-auth" class="pt-4 flex flex-col sm:flex-row justify-center items-center gap-4 max-w-md mx-auto">
             </div>
-            <div id="packs-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6"></div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full z-10 relative">
+        
+        <div id="shop-section" class="space-y-8 scroll-mt-24">
+            <div class="flex items-center gap-4 border-b border-gray-900 pb-4">
+                <h2 class="heading-font text-3xl font-bold tracking-wide uppercase text-white">
+                    <span class="text-gold mr-2">//</span> Pacchetti Esclusivi disponibili
+                </h2>
+            </div>
+
+            <div id="packs-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
+                <div class="col-span-full text-center py-12 text-gray-500 animate-pulse">
+                    <i class="fas fa-spinner fa-spin text-2xl text-amber-500 mb-2"></i>
+                    <p>Connessione al server di Vinewood in corso...</p>
+                </div>
+            </div>
         </div>
 
-        <div id="auth-section" class="hidden max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl my-12">
-            <h2 id="auth-title" class="text-2xl font-bold text-center mb-6 text-white">Accedi al Portale</h2>
-            <form id="auth-form" class="space-y-4">
+        <div id="auth-section" class="hidden max-w-md mx-auto bg-gray-950/60 border border-gray-900 rounded-2xl p-8 shadow-2xl my-12 backdrop-blur-md gold-glow">
+            <div class="text-center mb-6">
+                <h2 id="auth-title" class="heading-font text-3xl font-bold uppercase tracking-wide text-white">Accedi al Portale</h2>
+                <p class="text-sm text-gray-400 mt-1">Gestisci i tuoi ordini e il tuo profilo</p>
+            </div>
+            <form id="auth-form" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Nickname PSN / Discord</label>
-                    <input type="text" id="auth-username" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-amber-500 standard-input">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Nickname PSN / Discord</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="far fa-user"></i></span>
+                        <input type="text" id="auth-username" required class="w-full bg-gray-900/50 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium text-sm">
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Password</label>
-                    <input type="password" id="auth-password" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-amber-500 standard-input">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Password di Sicurezza</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><i class="fas fa-lock"></i></span>
+                        <input type="password" id="auth-password" required class="w-full bg-gray-900/50 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-medium text-sm">
+                    </div>
                 </div>
-                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold py-2.5 rounded-lg transition mt-2 cursor-pointer">Procedi</button>
+                <button type="submit" class="w-full bg-gold bg-gold-hover text-gray-950 font-bold py-3.5 rounded-xl transition shadow-lg shadow-amber-500/10 uppercase tracking-wider text-sm cursor-pointer font-bold">Conferma e Procedi</button>
             </form>
-            <p class="text-center text-sm text-gray-500 mt-4">
-                <span id="auth-switch-text">Non hai un account?</span> 
-                <button id="auth-switch-btn" class="text-amber-500 hover:underline ml-1 font-medium cursor-pointer">Registrati</button>
+            <p class="text-center text-sm text-gray-400 mt-5">
+                <span id="auth-switch-text">Nuovo cittadino?</span> 
+                <button id="auth-switch-btn" class="text-amber-400 hover:text-amber-300 underline ml-1 font-semibold cursor-pointer">Crea un account</button>
             </p>
         </div>
 
         <div id="admin-section" class="hidden space-y-8">
-            <div class="flex justify-between items-center border-b border-gray-800 pb-4">
-                <h2 class="text-3xl font-bold text-white"><i class="fas fa-user-shield text-amber-500 mr-2"></i>Pannello Amministratore</h2>
-                <button onclick="showSection('shop')" class="text-gray-400 hover:text-white flex items-center gap-2 cursor-pointer"><i class="fas fa-arrow-left"></i> Torna allo Shop</button>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-900 pb-4 gap-4">
+                <h2 class="heading-font text-3xl font-bold text-white uppercase tracking-wide"><i class="fas fa-user-shield text-amber-500 mr-2"></i>Pannello di Controllo Staff</h2>
+                <button onclick="showSection('shop')" class="text-sm bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 px-4 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer"><i class="fas fa-arrow-left"></i> Torna allo Shop</button>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div class="space-y-6">
-                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                        <h3 class="text-xl font-bold mb-4 text-white"><i class="fas fa-cogs text-amber-500 mr-2"></i>Impostazioni Sito</h3>
+                    <div class="bg-gray-950/80 border border-gray-900 rounded-xl p-6 space-y-4">
+                        <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-sliders text-amber-500 mr-2"></i>Impostazioni Sito</h3>
                         <form id="settings-form" class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">Nome del Server</label>
-                                <input type="text" id="settings-site-name" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Nome Server / Testo Logo</label>
+                                <input type="text" id="settings-site-name" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">URL Immagine Logo (Opzionale)</label>
-                                <input type="url" id="settings-logo-url" placeholder="https://link-immagine.com/logo.png" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">URL Immagine Logo (.png / .jpg)</label>
+                                <input type="url" id="settings-logo-url" placeholder="https://link.com/logo.png" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
-                            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold py-2 rounded-lg transition cursor-pointer">Aggiorna Identità</button>
+                            <button type="submit" class="w-full bg-gold text-gray-950 font-bold py-2.5 rounded-lg text-sm transition uppercase tracking-wide cursor-pointer">Salva Impostazioni</button>
                         </form>
                     </div>
 
-                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                        <h3 class="text-xl font-bold mb-4 text-white"><i class="fas fa-box-open text-amber-500 mr-2"></i>Crea Nuovo Pack</h3>
+                    <div class="bg-gray-950/80 border border-gray-900 rounded-xl p-6 space-y-4">
+                        <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-box-open text-amber-500 mr-2"></i>Aggiungi Nuovo Pacchetto</h3>
                         <form id="pack-form" class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">Nome Pack</label>
-                                <input type="text" id="pack-name" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Nome Pacchetto</label>
+                                <input type="text" id="pack-name" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">Prezzo (€)</label>
-                                <input type="number" step="0.01" id="pack-price" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Prezzo di Vendita (€)</label>
+                                <input type="number" step="0.01" id="pack-price" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">URL Immagine</label>
-                                <input type="url" id="pack-image" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">URL Immagine Copertina</label>
+                                <input type="url" id="pack-image" placeholder="https://unsplash.com/foto.png" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">Descrizione</label>
-                                <textarea id="pack-desc" rows="3" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"></textarea>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Descrizione Benefici e Contenuti</label>
+                                <textarea id="pack-desc" rows="3" required class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 text-sm font-medium"></textarea>
                             </div>
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition cursor-pointer">Salva Pacchetto</button>
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-sm transition uppercase tracking-wide cursor-pointer">Pubblica nello Shop</button>
                         </form>
                     </div>
                 </div>
 
-                <div class="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 class="text-xl font-bold mb-4 text-white"><i class="fas fa-users text-amber-500 mr-2"></i>Gestione Utenti Registrati</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm text-gray-400">
-                            <thead class="bg-gray-950 text-gray-300 uppercase text-xs">
+                <div class="lg:col-span-2 bg-gray-950/80 border border-gray-900 rounded-xl p-6 space-y-4">
+                    <h3 class="heading-font text-xl font-bold text-white uppercase tracking-wider border-b border-gray-900 pb-2"><i class="fas fa-users text-amber-500 mr-2"></i>Gestione Permessi Cittadini</h3>
+                    <p class="text-xs text-gray-400">Database utenti registrati su Supabase. Usa il tasto azione per promuovere ad amministratore o revocare i permessi.</p>
+                    <div class="overflow-x-auto rounded-lg border border-gray-900">
+                        <table class="w-full text-left text-xs text-gray-400">
+                            <thead class="bg-gray-900 text-gray-300 uppercase font-bold tracking-wider">
                                 <tr>
-                                    <th class="px-4 py-3">Nickname</th>
-                                    <th class="px-4 py-3">Ruolo</th>
-                                    <th class="px-4 py-3 text-right">Azione</th>
+                                    <th class="px-4 py-3.5">Nome Utente</th>
+                                    <th class="px-4 py-3.5">Grado Account</th>
+                                    <th class="px-4 py-3.5 text-right">Azioni Staff</th>
                                 </tr>
                             </thead>
-                            <tbody id="users-table-body"></tbody>
+                            <tbody id="users-table-body" class="divide-y divide-gray-900">
+                                </tbody>
                         </table>
                     </div>
                 </div>
@@ -133,77 +202,136 @@
         </div>
     </main>
 
-    <div id="purchase-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full text-center space-y-4 shadow-2xl">
-            <div class="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center text-3xl mx-auto">
+    <div id="purchase-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="bg-gray-950 border border-gray-900 rounded-2xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl gold-glow animate-fade-in">
+            <div class="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto border border-amber-500/30">
                 <i class="fas fa-check-circle"></i>
             </div>
-            <h3 class="text-2xl font-bold text-white">Ordine Inizializzato!</h3>
-            <p class="text-gray-400">Per completare il pagamento del pacchetto ed ottenerlo su PS4, apri un ticket nel nostro server Discord dedicato.</p>
-            <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 text-sm font-mono text-amber-500 break-all select-all">https://discord.gg/AEWw6RCvDh</div>
-            <div class="flex gap-3 pt-2">
-                <button onclick="closeModal()" class="w-1/2 bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 rounded-lg transition cursor-pointer">Chiudi</button>
-                <a href="https://discord.gg/AEWw6RCvDh" target="_blank" class="w-1/2 bg-gray-800 border border-amber-500 hover:bg-amber-500/20 text-white font-medium py-2 rounded-lg transition flex items-center justify-center gap-2">
+            <div class="space-y-1">
+                <h3 class="heading-font text-2xl font-bold uppercase tracking-wide text-white">Ordine Ricevuto!</h3>
+                <p class="text-sm text-gray-400">Per completare la transazione del pacchetto ed ottenerlo su PS4, esegui il checkout sul nostro canale dedicato.</p>
+            </div>
+            <div class="bg-gray-900 p-3.5 rounded-xl border border-gray-800 text-sm font-mono text-amber-400 break-all select-all flex items-center justify-center gap-2">
+                <i class="fab fa-discord text-xs text-gray-500"></i> https://discord.gg/vinewoodrpv3
+            </div>
+            <div class="flex gap-3 pt-1">
+                <button onclick="closeModal()" class="w-1/2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-white font-semibold py-2.5 rounded-xl transition text-sm cursor-pointer">Chiudi</button>
+                <a href="https://discord.gg/vinewoodrpv3" target="_blank" class="w-1/2 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
                     Apri Ticket <i class="fas fa-external-link-alt text-xs"></i>
                 </a>
             </div>
         </div>
     </div>
 
-    <footer class="border-t border-gray-800 bg-gray-950 py-6 mt-12 text-center text-sm text-gray-500">
-        <p>&copy; 2026 <span id="footer-site-name">Vinewood RP V3</span>. Tutti i diritti riservati.</p>
+    <footer class="border-t border-gray-900 bg-gray-950/80 py-8 text-center text-xs text-gray-500 tracking-wide">
+        <p class="max-w-2xl mx-auto px-4">&copy; 2026 <span id="footer-site-name" class="text-gray-300 font-semibold">Vinewood RP V3</span>. Tutti i diritti riservati. Questo portale indipendente non è affiliato o approvato da Sony Interactive Entertainment o Rockstar Games.</p>
     </footer>
 
     <script>
-        // CONFIGURAZIONE VARIABILI DA INSERIRE DIRETTAMENTE NEL CODICE O TRAMITE BUILD O INLINE
-        // Per semplicità assoluta, inserisci qui l'URL e la Chiave del tuo progetto Supabase:
+        // CONFIGURAZIONE CREDENZIALI FORNITE (INSERITE DIRETTAMENTE)
         const SUPABASE_URL = "https://gfrarmsqvchrzsqxalpb.supabase.co"; 
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmcmFybXNxdmNocnpzcXhhbHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3Nzg2NjUsImV4cCI6MjA5NzM1NDY2NX0.xqd0ymiMVKFpEGWg3tAzT1SMq6aTNOV2N8bjvzTNcB0";
 
-        const supabase =  supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Inizializzazione client Supabase
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || null;
         let isRegisterMode = false;
 
+        // Funzione di avvio complessivo dell'app
         async function init() {
             await renderSiteIdentity();
             renderAuthButtons();
+            renderHeroAuthZone();
             await renderPacks();
             await renderUsersTable();
         }
 
+        // 1. Rendering dinamico Identità del Sito (Logo / Titoli)
         async function renderSiteIdentity() {
-            const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).single();
-            if (data) {
-                document.getElementById('footer-site-name').innerText = data.name;
-                document.getElementById('settings-site-name').value = data.name;
-                document.getElementById('settings-logo-url').value = data.logo_url || "";
-                
-                const container = document.getElementById('site-logo-container');
-                if (data.logo_url && data.logo_url.trim() !== "") {
-                    container.innerHTML = `
-                        <img src="${data.logo_url}" alt="Logo" class="h-9 w-auto object-contain rounded">
-                        <span class="text-xl font-black tracking-wider text-amber-500 hidden sm:inline">${data.name}</span>
-                    `;
-                } else {
-                    container.innerHTML = `<span class="text-xl font-black tracking-wider text-amber-500">${data.name}</span>`;
+            try {
+                const { data, error } = await supabaseClient.from('site_settings').select('*').eq('id', 1).single();
+                if (data) {
+                    document.getElementById('footer-site-name').innerText = data.name;
+                    document.getElementById('settings-site-name').value = data.name;
+                    document.getElementById('settings-logo-url').value = data.logo_url || "";
+                    
+                    const container = document.getElementById('site-logo-container');
+                    if (data.logo_url && data.logo_url.trim() !== "") {
+                        container.innerHTML = `
+                            <img src="${data.logo_url}" alt="Logo Server" class="h-10 w-auto object-contain rounded border border-gray-800">
+                            <span class="heading-font text-2xl font-black tracking-wider text-gold hidden sm:inline uppercase">${data.name}</span>
+                        `;
+                    } else {
+                        container.innerHTML = `<span class="heading-font text-2xl font-black tracking-wider text-gold uppercase">${data.name}</span>`;
+                    }
                 }
+            } catch (err) {
+                console.error("Errore nel caricamento del logo:", err);
             }
         }
 
+        // 2. Modifica Logo e Titolo da Admin
         document.getElementById('settings-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('settings-site-name').value.trim() || "VINEWOOD RP V3";
             const logo_url = document.getElementById('settings-logo-url').value.trim();
 
-            const { error } = await supabase.from('site_settings').update({ name, logo_url }).eq('id', 1);
-            if (error) alert("Errore nel salvataggio: " + error.message);
-            else {
+            const { error } = await supabaseClient.from('site_settings').update({ name, logo_url }).eq('id', 1);
+            if (error) {
+                alert("Errore nel salvataggio su database cloud: " + error.message);
+            } else {
                 await renderSiteIdentity();
-                alert("Identità del sito aggiornata sul Database!");
+                alert("Identità del server e Logo modificati con successo!");
             }
         });
 
+        // 3. Render pulsanti di autenticazione nella NAVBAR alta
+        function renderAuthButtons() {
+            const container = document.getElementById('auth-buttons');
+            if (currentUser) {
+                container.innerHTML = `
+                    ${currentUser.is_admin ? `<button onclick="showSection('admin')" class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"><i class="fas fa-user-shield"></i> Pannello Staff</button>` : ''}
+                    <span class="text-xs font-semibold bg-gray-900 border border-gray-800 px-3.5 py-2 rounded-xl text-gray-300 flex items-center gap-2"><i class="far fa-user text-amber-400"></i> ${currentUser.username.toUpperCase()}</span>
+                    <button onclick="logout()" class="text-gray-400 hover:text-rose-500 text-xs font-bold uppercase tracking-wider transition cursor-pointer pl-1">Esci</button>
+                `;
+            } else {
+                container.innerHTML = `
+                    <button onclick="openAuth(false)" class="text-gray-300 hover:text-white text-xs font-bold uppercase tracking-wider transition px-2 py-2 cursor-pointer">Accedi</button>
+                    <button onclick="openAuth(true)" class="bg-gold bg-gold-hover text-gray-950 font-bold px-4 py-2 rounded-xl text-xs uppercase tracking-wider transition cursor-pointer shadow-md shadow-amber-500/5">Registrati</button>
+                `;
+            }
+        }
+
+        // 4. RENDERING ZONA AUTH IN HERO (Visibilità immediata garantita all'utente appena entra)
+        function renderHeroAuthZone() {
+            const container = document.getElementById('quick-hero-auth');
+            if (currentUser) {
+                container.innerHTML = `
+                    <div class="w-full bg-gray-950/40 border border-gray-900 rounded-xl p-4 flex items-center justify-between gap-4 backdrop-blur-sm">
+                        <div class="flex items-center gap-3 text-left">
+                            <div class="w-9 h-9 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold"><i class="far fa-user"></i></div>
+                            <div>
+                                <h4 class="text-xs text-gray-500 uppercase font-bold tracking-wider">Sessione Attiva</h4>
+                                <p class="text-sm font-bold text-white">${currentUser.username}</p>
+                            </div>
+                        </div>
+                        <a href="#shop-section" class="bg-gold text-gray-950 font-bold px-4 py-2 rounded-lg text-xs uppercase tracking-wider transition">Esplora i Pack <i class="fas fa-arrow-down ml-1"></i></a>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <button onclick="openAuth(false)" class="w-full sm:w-1/2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-white font-bold py-3.5 px-6 rounded-xl transition text-sm uppercase tracking-wider cursor-pointer shadow-lg">
+                        <i class="fas fa-sign-in-alt mr-2 text-amber-400"></i> Accedi Ora
+                    </button>
+                    <button onclick="openAuth(true)" class="w-full sm:w-1/2 bg-gold bg-gold-hover text-gray-950 font-extrabold py-3.5 px-6 rounded-xl transition text-sm uppercase tracking-wider cursor-pointer shadow-lg shadow-amber-500/10">
+                        <i class="fas fa-user-plus mr-2"></i> Diventa Membro
+                    </button>
+                `;
+            }
+        }
+
+        // 5. Cambio di sezione fluido (Single Page Application)
         function showSection(section) {
             document.getElementById('shop-section').classList.add('hidden');
             document.getElementById('auth-section').classList.add('hidden');
@@ -215,118 +343,123 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function renderAuthButtons() {
-            const container = document.getElementById('auth-buttons');
-            if (currentUser) {
-                container.innerHTML = `
-                    ${currentUser.is_admin ? `<button onclick="showSection('admin')" class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer"><i class="fas fa-user-shield"></i> Admin</button>` : ''}
-                    <span class="text-sm bg-gray-900 border border-gray-800 px-3 py-2 rounded-lg text-gray-300 flex items-center gap-2"><i class="far fa-user text-amber-500"></i> ${currentUser.username}</span>
-                    <button onclick="logout()" class="text-gray-400 hover:text-rose-500 text-sm transition font-medium cursor-pointer">Esci</button>
-                `;
-            } else {
-                container.innerHTML = `
-                    <button onclick="openAuth(false)" class="text-gray-300 hover:text-white text-sm font-medium transition px-3 py-2 cursor-pointer">Accedi</button>
-                    <button onclick="openAuth(true)" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">Registrati</button>
-                `;
-            }
-        }
-
+        // 6. Render della Griglia dei Pacchetti VIP presi dal Cloud
         async function renderPacks() {
             const grid = document.getElementById('packs-grid');
-            const { data: packsArray, error } = await supabase.from('packs').select('*').order('created_at', { ascending: true });
-            
-            grid.innerHTML = '';
-            if(packsArray) {
-                packsArray.forEach(pack => {
-                    grid.innerHTML += `
-                        <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-lg flex flex-col justify-between hover:border-gray-700 transition duration-300">
-                            <img src="${pack.image}" alt="${pack.name}" class="w-full h-48 object-cover">
-                            <div class="p-5 flex-grow flex flex-col justify-between space-y-4">
-                                <div>
-                                    <h3 class="text-xl font-bold text-white mb-2">${pack.name}</h3>
-                                    <p class="text-gray-400 text-sm leading-relaxed">${pack.description}</p>
+            try {
+                const { data: packsArray, error } = await supabaseClient.from('packs').select('*').order('created_at', { ascending: true });
+                
+                grid.innerHTML = '';
+                if (packsArray && packsArray.length > 0) {
+                    packsArray.forEach(pack => {
+                        grid.innerHTML += `
+                            <div class="bg-gray-950/60 border border-gray-900 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between hover:border-gray-800 transition duration-300 backdrop-blur-sm gold-glow-hover group">
+                                <div class="relative overflow-hidden h-48 border-b border-gray-900">
+                                    <img src="${pack.image}" alt="${pack.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                                    <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent"></div>
                                 </div>
-                                <div class="flex items-center justify-between pt-2">
-                                    <span class="text-2xl font-black text-amber-500">${pack.price} €</span>
-                                    <button onclick="buyPack()" class="bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold px-4 py-2 rounded-lg text-sm transition shadow-lg shadow-amber-500/10 flex items-center gap-2 cursor-pointer">
-                                        <i class="fas fa-shopping-cart text-xs"></i> Acquista
-                                    </button>
+                                <div class="p-5 flex-grow flex flex-col justify-between space-y-5">
+                                    <div class="space-y-2">
+                                        <h3 class="heading-font text-xl font-bold text-white group-hover:text-amber-400 transition uppercase tracking-wide">${pack.name}</h3>
+                                        <p class="text-gray-400 text-xs sm:text-sm leading-relaxed font-medium">${pack.description}</p>
+                                    </div>
+                                    <div class="flex items-center justify-between pt-2 border-t border-gray-900/60">
+                                        <div class="flex flex-col">
+                                            <span class="text-2xl font-black heading-font text-gold">${pack.price} €</span>
+                                            <span class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Tasse incluse</span>
+                                        </div>
+                                        <button onclick="buyPack()" class="bg-gold bg-gold-hover text-gray-950 font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/5 flex items-center gap-2 cursor-pointer">
+                                            <i class="fas fa-shopping-cart text-[10px]"></i> Acquista
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                });
+                        `;
+                    });
+                } else {
+                    grid.innerHTML = `<div class="col-span-full text-center py-8 text-gray-500 font-medium">Nessun pacchetto inserito nello shop al momento.</div>`;
+                }
+            } catch (err) {
+                grid.innerHTML = `<div class="col-span-full text-center py-8 text-rose-500 font-medium">Errore nel caricamento dei dati da Supabase.</div>`;
             }
         }
 
+        // 7. Render della Tabella Utenti per gli Amministratori
         async function renderUsersTable() {
             const tbody = document.getElementById('users-table-body');
             if (!currentUser || !currentUser.is_admin) return;
 
-            const { data: users, error } = await supabase.from('users').select('*').order('username', { ascending: true });
-            tbody.innerHTML = '';
+            try {
+                const { data: users, error } = await supabaseClient.from('users').select('*').order('username', { ascending: true });
+                tbody.innerHTML = '';
 
-            if(users) {
-                users.forEach(user => {
-                    tbody.innerHTML += `
-                        <tr class="border-b border-gray-800 hover:bg-gray-950/50 transition">
-                            <td class="px-4 py-3 font-medium text-white">${user.username}</td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-1 rounded text-xs font-semibold ${user.is_admin ? 'bg-amber-500/10 text-amber-500' : 'bg-gray-800 text-gray-400'}">
-                                    ${user.is_admin ? 'Amministratore' : 'Utente'}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <button onclick="toggleAdmin('${user.id}', ${user.is_admin})" class="text-sm p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition cursor-pointer">
-                                    <i class="fas ${user.is_admin ? 'fa-user-minus text-rose-400' : 'fa-user-plus text-emerald-400'}"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                });
+                if (users) {
+                    users.forEach(user => {
+                        tbody.innerHTML += `
+                            <tr class="border-b border-gray-900 hover:bg-gray-900/20 transition text-sm">
+                                <td class="px-4 py-3.5 font-bold text-gray-200 tracking-wide">${user.username}</td>
+                                <td class="px-4 py-3.5">
+                                    <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${user.is_admin ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-gray-900 text-gray-500'}">
+                                        ${user.is_admin ? 'Amministratore' : 'Cittadino'}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3.5 text-right">
+                                    <button onclick="toggleAdmin('${user.id}', ${user.is_admin})" class="text-xs p-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-800 transition cursor-pointer" title="Modifica Grado Utente">
+                                        <i class="fas ${user.is_admin ? 'fa-user-minus text-rose-400' : 'fa-user-plus text-emerald-400'}"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (err) {
+                console.error("Errore nel caricamento della tabella utenti:", err);
             }
         }
 
+        // 8. Gestione Apertura Finestra Autenticazione
         function openAuth(register = false) {
             isRegisterMode = register;
             document.getElementById('auth-title').innerText = register ? "Crea un nuovo account" : "Accedi al Portale";
-            document.getElementById('auth-switch-text').innerText = register ? "Hai già un account?" : "Non hai un account?";
-            document.getElementById('auth-switch-btn').innerText = register ? "Accedi" : "Registrati";
+            document.getElementById('auth-switch-text').innerText = register ? "Hai già un account?" : "Nuovo cittadino?";
+            document.getElementById('auth-switch-btn').innerText = register ? "Accedi" : "Crea un account";
             showSection('auth');
         }
 
         document.getElementById('auth-switch-btn').addEventListener('click', () => openAuth(!isRegisterMode));
 
+        // 9. Login e Registrazione integrati con Supabase
         document.getElementById('auth-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const userIn = document.getElementById('auth-username').value.trim();
             const passIn = document.getElementById('auth-password').value;
 
             if (isRegisterMode) {
-                const { data, error } = await supabase.from('users').insert([{ username: userIn, password: passIn }]).select();
+                const { data, error } = await supabaseClient.from('users').insert([{ username: userIn, password: passIn }]).select();
                 if (error) {
-                    alert("Errore nella registrazione (Il nickname potrebbe essere già preso).");
+                    alert("Errore nella registrazione. Il nickname potrebbe essere già registrato da un altro giocatore.");
                 } else {
                     currentUser = data[0];
                     sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    alert("Registrazione completata!");
-                    init();
+                    alert("Registrazione completata con successo! Benvenuto in città.");
+                    await init();
                     showSection('shop');
                 }
             } else {
-                const { data, error } = await supabase.from('users').select('*').eq('username', userIn).eq('password', passIn).single();
+                const { data, error } = await supabaseClient.from('users').select('*').eq('username', userIn).eq('password', passIn).maybeSingle();
                 if (error || !data) {
-                    alert("Nickname o password errati.");
+                    alert("Credenziali errate o account non esistente. Riprova.");
                 } else {
                     currentUser = data;
                     sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    init();
+                    await init();
                     showSection('shop');
                 }
             }
             document.getElementById('auth-form').reset();
         });
 
+        // 10. Logout utente
         function logout() {
             currentUser = null;
             sessionStorage.removeItem('currentUser');
@@ -334,17 +467,21 @@
             showSection('shop');
         }
 
+        // 11. Promozione / Revoca amministratore su database cloud
         async function toggleAdmin(userId, currentStatus) {
-            const { error } = await supabase.from('users').update({ is_admin: !currentStatus }).eq('id', userId);
+            const { error } = await supabaseClient.from('users').update({ is_admin: !currentStatus }).eq('id', userId);
             if (!error) {
                 if (currentUser && currentUser.id === userId) {
                     currentUser.is_admin = !currentStatus;
                     sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
                 }
                 await init();
+            } else {
+                alert("Errore nel cambio permessi: " + error.message);
             }
         }
 
+        // 12. Creazione Nuovi Pack inviati a Supabase
         document.getElementById('pack-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('pack-name').value;
@@ -352,16 +489,17 @@
             const image = document.getElementById('pack-image').value;
             const description = document.getElementById('pack-desc').value;
 
-            const { error } = await supabase.from('packs').insert([{ name, price, image, description }]);
+            const { error } = await supabaseClient.from('packs').insert([{ name, price, image, description }]);
             if (!error) {
                 document.getElementById('pack-form').reset();
                 await renderPacks();
-                alert("Nuovo pacchetto inserito nel Cloud database!");
+                alert("Pacchetto aggiunto con successo al database di Supabase!");
             } else {
-                alert("Errore: " + error.message);
+                alert("Errore nell'inserimento del pacchetto: " + error.message);
             }
         });
 
+        // 13. Modale Checkout
         function buyPack() {
             document.getElementById('purchase-modal').classList.remove('hidden');
         }
