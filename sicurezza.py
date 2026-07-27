@@ -26,7 +26,7 @@ intents.invites = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Configurazione globale (salvata e sincronizzata via Cloud Discord su server secondario)
+# Configurazione globale predefinita
 config_data = {
     "security": {
         "anti_link": {
@@ -196,47 +196,134 @@ async def is_owner_or_guild_owner(interaction: discord.Interaction) -> bool:
 
 
 # ==========================================
-# 🎛️ PANNELLO DI SETTING (COMANDI DISCORD)
+# 🎛️ PANNELLO DI SETTING COMPLETO INTERATTIVO
 # ==========================================
 
-class SettingsView(discord.ui.View):
+class ModuleSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Anti-Link", value="anti_link", description="Gestisci blocchi e azioni per i link esterni", emoji="🔗"),
+            discord.SelectOption(label="Anti-Invite", value="anti_invite", description="Gestisci blocchi per inviti Discord", emoji="📨"),
+            discord.SelectOption(label="Anti-Spam", value="anti_spam", description="Gestisci protezione anti-spam", emoji="⚡"),
+            discord.SelectOption(label="Anti-Bot Add", value="anti_bot_add", description="Protezione contro aggiunta bot non autorizzati", emoji="🤖"),
+            discord.SelectOption(label="Anti-Role Create", value="anti_role_create", description="Gestisci creazione ruoli", emoji="🏷️"),
+            discord.SelectOption(label="Anti-Role Delete", value="anti_role_delete", description="Gestisci eliminazione ruoli", emoji="🗑️"),
+            discord.SelectOption(label="Anti-Dangerous Role", value="anti_dangerous_role", description="Protezione ruoli con permessi pericolosi", emoji="⚠️"),
+            discord.SelectOption(label="Anti-Channel Create", value="anti_channel_create", description="Gestisci creazione canali", emoji="📁"),
+            discord.SelectOption(label="Anti-Channel Delete", value="anti_channel_delete", description="Gestisci eliminazione canali", emoji="❌"),
+        ]
+        super().__init__(placeholder="Seleziona un modulo di sicurezza da configurare...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
+        
+        module_key = self.values[0]
+        view = ModuleConfigView(module_key)
+        mod_info = config_data["security"][module_key]
+        
+        status_str = "✅ Abilitato" if mod_info.get("enabled") else "❌ Disabilitato"
+        desc = (
+            f"**Modulo Selezionato:** `{module_key.replace('_', ' ').title()}`\n"
+            f"**Stato Attuale:** {status_str}\n"
+            f"**Azione:** `{mod_info.get('action', 'N/D')}`\n"
+        )
+        if "timeout_minutes" in mod_info:
+            desc += f"**Durata Timeout:** `{mod_info.get('timeout_minutes')} minuti`\n"
+            
+        embed = discord.Embed(title=f"⚙️ Configurazione: {module_key.replace('_', ' ').title()}", description=desc, color=discord.Color.blue())
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ModuleConfigView(discord.ui.View):
+    def __init__(self, module_key: str):
+        super().__init__(timeout=180)
+        self.module_key = module_key
+
+    @discord.ui.button(label="Attiva/Disattiva", style=discord.ButtonStyle.blurple, emoji="🔄")
+    async def toggle_enabled(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
+        curr = config_data["security"][self.module_key].get("enabled", True)
+        config_data["security"][self.module_key]["enabled"] = not curr
+        discord.utils.run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
+        
+        await interaction.response.send_message(f"✅ Stato del modulo modificato a: **{'Abilitato' if not curr else 'Disabilitato'}**", ephemeral=True)
+
+    @discord.ui.button(label="Cambia Azione & Parametri", style=discord.ButtonStyle.green, emoji="⚙️")
+    async def change_action(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        modal = ModuleSettingsModal(self.module_key)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="⬅️ Torna al Menu", style=discord.ButtonStyle.grey)
+    async def back_to_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
+        embed = discord.Embed(
+            title="🎛️ Pannello di Controllo - Security & Logs",
+            description="Usa i menu e i pulsanti sottostanti per configurare interamente il bot.",
+            color=discord.Color.blurple()
+        )
+        view = SettingsMainView(interaction)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ModuleSettingsModal(discord.ui.Modal, title="Modifica Parametri Modulo"):
+    def __init__(self, module_key: str):
+        super().__init__()
+        self.module_key = module_key
+        
+        curr_action = config_data["security"][module_key].get("action", "delete")
+        curr_timeout = str(config_data["security"][module_key].get("timeout_minutes", 1))
+        
+        self.action_input = discord.ui.TextInput(
+            label="Azione (delete, timeout, kick, ban, remove_perms)",
+            default=curr_action,
+            required=True,
+            max_length=20
+        )
+        self.timeout_input = discord.ui.TextInput(
+            label="Minuti di Timeout (se applicabile)",
+            default=curr_timeout,
+            required=False,
+            max_length=5
+        )
+        self.add_item(self.action_input)
+        self.add_item(self.timeout_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+            
+        new_action = self.action_input.value.strip().lower()
+        config_data["security"][self.module_key]["action"] = new_action
+        
+        if self.timeout_input.value and self.timeout_input.value.isdigit():
+            config_data["security"][self.module_key]["timeout_minutes"] = int(self.timeout_input.value.strip())
+            
+        discord.utils.run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
+        await interaction.response.send_message(f"✅ Parametri aggiornati con successo per `{self.module_key}`!", ephemeral=True)
+
+
+class SettingsMainView(discord.ui.View):
     def __init__(self, inter: discord.Interaction):
         super().__init__(timeout=180)
         self.inter = inter
+        self.add_item(ModuleSelect())
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        allowed = await is_owner_or_guild_owner(interaction)
-        if not allowed:
-            await interaction.response.send_message("❌ Solo il proprietario del bot o il proprietario del server possono usare questi pulsanti.", ephemeral=True)
-            return False
-        return True
-
-    @discord.ui.button(label="Stato Sicurezza", style=discord.ButtonStyle.primary, emoji="🛡️")
-    async def security_status(self, interaction: discord.Interaction, button: discord.ui.Button):
-        sec = config_data["security"]
-        desc = ""
-        for k, v in sec.items():
-            status = "✅ Abilitato" if v.get("enabled") else "❌ Disabilitato"
-            desc += f"**{k.replace('_', ' ').title()}**: {status}\n"
-        
-        embed = discord.Embed(title="🛡️ Stato Moduli di Sicurezza", description=desc, color=discord.Color.blue())
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="Global Whitelist", style=discord.ButtonStyle.success, emoji="🌐")
+    @discord.ui.button(label="Global Whitelist", style=discord.ButtonStyle.success, emoji="🌐", row=1)
     async def global_whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = GlobalWhitelistModal()
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="Canali Log", style=discord.ButtonStyle.secondary, emoji="📋")
+    @discord.ui.button(label="Configura Canali Log", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
     async def log_channels_view(self, interaction: discord.Interaction, button: discord.ui.Button):
-        logs = config_data["log_channels"]
-        desc = ""
-        for k, v in logs.items():
-            ch_mention = f"<#{v}>" if v else "Non impostato"
-            desc += f"**{k.title()}**: {ch_mention}\n"
-            
-        embed = discord.Embed(title="📋 Configurazione Canali Log", description=desc, color=discord.Color.gold())
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        modal = LogChannelsModal()
+        await interaction.response.send_modal(modal)
 
 
 class GlobalWhitelistModal(discord.ui.Modal, title="Gestione Global Whitelist"):
@@ -296,17 +383,49 @@ class GlobalWhitelistModal(discord.ui.Modal, title="Gestione Global Whitelist"):
         )
 
 
-@bot.tree.command(name="settings", description="Apre il pannello di controllo completo del bot")
+class LogChannelsModal(discord.ui.Modal, title="Imposta Canale Log"):
+    log_type = discord.ui.TextInput(
+        label="Tipo (messages, members, channels, roles, voice, security)",
+        placeholder="es. security",
+        required=True,
+        max_length=20
+    )
+    channel_id = discord.ui.TextInput(
+        label="ID del canale Discord",
+        placeholder="Inserisci l'ID numerico del canale...",
+        required=True,
+        max_length=25
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
+            
+        l_type = self.log_type.value.strip().lower()
+        if l_type not in config_data["log_channels"]:
+            return await interaction.response.send_message("❌ Tipo di log non valido.", ephemeral=True)
+            
+        try:
+            ch_val = int(self.channel_id.value.strip())
+        except ValueError:
+            return await interaction.response.send_message("❌ ID canale non valido.", ephemeral=True)
+            
+        config_data["log_channels"][l_type] = ch_val
+        discord.utils.run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
+        await interaction.response.send_message(f"✅ Canale log per `{l_type}` impostato su <#{ch_val}>!", ephemeral=True)
+
+
+@bot.tree.command(name="settings", description="Apre il pannello di controllo completo e interattivo del bot")
 async def settings_command(interaction: discord.Interaction):
     if not await is_owner_or_guild_owner(interaction):
         return await interaction.response.send_message("❌ Questo comando può essere eseguito solo dal proprietario del bot o dal proprietario del server.", ephemeral=True)
     
     embed = discord.Embed(
         title="🎛️ Pannello di Controllo - Security & Logs",
-        description="Usa i pulsanti sottostanti per visualizzare lo stato della sicurezza, gestire la **Global Whitelist** su tutti i moduli o controllare i canali di log.",
+        description="Usa il menu a tendina e i pulsanti sottostanti per gestire e configurare interamente ogni modulo di sicurezza, le whitelist e i canali log.",
         color=discord.Color.blurple()
     )
-    view = SettingsView(interaction)
+    view = SettingsMainView(interaction)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
@@ -454,7 +573,6 @@ async def on_member_join(member: discord.Member):
             except:
                 pass
 
-            # Se l'utente che ha aggiunto il bot NON è whitelistato, applica le restrizioni e invia il log
             if adder and not (adder.guild_permissions.administrator or adder.id in sec["whitelist_users"]):
                 action = sec.get("action", "kick")
                 action_desc = await apply_generic_action(guild, adder, action, "Aggiunta bot non autorizzata")
@@ -470,7 +588,6 @@ async def on_member_join(member: discord.Member):
                 await send_typed_log(guild, "security", embed)
                 return
             else:
-                # Se è whitelistato, esce senza loggare nulla sulla sicurezza
                 return
 
     embed = discord.Embed(title="📥 Nuovo Utente Entrato", color=discord.Color.green(), timestamp=discord.utils.utcnow())
@@ -571,7 +688,6 @@ async def on_guild_role_delete(role: discord.Role):
         await send_typed_log(guild, "security", embed)
         return
 
-    # Se è whitelistato o il modulo è disattivato, invia solo il log normale dei ruoli
     embed = discord.Embed(title="🗑️ Ruolo Eliminato", color=discord.Color.red(), timestamp=discord.utils.utcnow())
     embed.add_field(name="Nome", value=role.name, inline=True)
     await send_typed_log(guild, "roles", embed)
