@@ -34,15 +34,17 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=PORT)
 
-# Configurazione Bot Discord
+# Configurazione Bot Discord con Intents e Cache forzata all'avvio
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.messages = True
+intents.members = True
+intents.presences = True
 
 class BackupBot(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(command_prefix="!", intents=intents, chunk_guilds_at_startup=True)
 
     async def setup_hook(self):
         await self.tree.sync()
@@ -57,10 +59,11 @@ async def on_ready():
         await sync_guild_structure(guild)
 
 async def sync_guild_structure(guild: discord.Guild):
-    """Sincronizzazione rapida di ruoli e canali"""
+    """Sincronizzazione completa della struttura (ruoli e canali)"""
     try:
         for role in guild.roles:
-            if role.is_default(): continue
+            if role.is_default(): 
+                continue
             supabase.table("roles").upsert({
                 "id": role.id,
                 "name": role.name,
@@ -82,14 +85,14 @@ async def sync_guild_structure(guild: discord.Guild):
                 "name": channel.name,
                 "type": str(channel.type),
                 "position": channel.position,
-                "category_id": channel.category_id if hasattr(channel, 'category_id') else None,
+                "category_id": channel.category_id if hasattr(channel, 'category_id') and channel.category_id else None,
                 "permission_overwrites": overwrites
             }).execute()
     except Exception as e:
-        print(f"Errore sincronizzazione struttura: {e}")
+        print(f"Errore sincronizzazione struttura server: {e}")
 
-# --- COMANDO SLASH: /avvia_backup (Aggiornamenti in DM) ---
-@bot.tree.command(name="avvia_backup", description="Esegue il backup completo dello storico dei messaggi (Invia i progressi in DM)")
+# --- COMANDO SLASH: /avvia_backup ---
+@bot.tree.command(name="avvia_backup", description="Esegue il backup completo (inclusi messaggi di bot) in DM")
 @app_commands.describe(password="La password segreta per avviare il backup")
 @app_commands.checks.has_permissions(administrator=True)
 async def avvia_backup(interaction: discord.Interaction, password: str):
@@ -97,27 +100,26 @@ async def avvia_backup(interaction: discord.Interaction, password: str):
         await interaction.response.send_message("❌ **Password segreta errata!** Operazione negata.", ephemeral=True)
         return
 
-    # Rispondi subito in modo effimero per confermare l'avvio
-    await interaction.response.send_message("🔄 **Backup avviato!** Controlla i tuoi Messaggi Privati (DM) per seguire lo stato in tempo reale.", ephemeral=True)
+    await interaction.response.send_message("🔄 **Backup avviato!** Controlla i tuoi Messaggi Privati (DM).", ephemeral=True)
 
     user = interaction.user
     guild = interaction.guild
 
     try:
-        status_msg = await user.send("🔄 **Inizializzazione backup storico in corso...**")
+        status_msg = await user.send("🔄 **Inizializzazione backup in corso...**")
     except Exception:
-        # Se l'utente ha i DM chiusi, manda un messaggio nel canale
-        status_msg = await interaction.followup.send(f"⚠️ {user.mention}, non posso inviarti DM! Segui qui l'avanzamento: 🔄 **Inizializzazione backup...**", ephemeral=False)
+        status_msg = await interaction.followup.send(f"⚠️ {user.mention}, non posso inviarti DM! Segui qui l'avanzamento.", ephemeral=False)
+
+    await sync_guild_structure(guild)
 
     total_saved = 0
-    text_channels = [c for c in guild.channels if isinstance(c, discord.TextChannel)]
+    text_channels = [c for c in guild.channels if c.type in (discord.ChannelType.text, discord.ChannelType.news)]
     format_channels = len(text_channels)
     
+    print(f"[BACKUP] Canali trovati da scansionare: {format_channels}")
+
     for index, channel in enumerate(text_channels, start=1):
-        try:
-            await status_msg.edit(content=f"🔄 **Backup in corso...** Canale `{channel.name}` ({index}/{format_channels}). Messaggi salvati finora: **{total_saved}**")
-        except Exception:
-            pass
+        print(f"-> Analisi canale #{channel.name} ({index}/{format_channels})")
         
         try:
             existing_res = supabase.table("messages").select("id").eq("channel_id", channel.id).execute()
@@ -125,10 +127,15 @@ async def avvia_backup(interaction: discord.Interaction, password: str):
         except Exception:
             existing_ids = set()
 
+        channel_messages_count = 0
+
         try:
             async for message in channel.history(limit=None, oldest_first=True):
-                if message.id in existing_ids or message.author.bot:
+                if message.id in existing_ids:
                     continue
+
+                attachments_urls = [att.url for att in message.attachments] if message.attachments else []
+                embeds_data = [embed.to_dict() for embed in message.embeds] if message.embeds else []
 
                 msg_data = {
                     "id": message.id,
@@ -136,23 +143,38 @@ async def avvia_backup(interaction: discord.Interaction, password: str):
                     "author_id": message.author.id,
                     "author_name": message.author.display_name,
                     "author_avatar": str(message.author.display_avatar.url),
-                    "content": message.content or "[Allegato o vuoto]"
+                    "content": message.content or "",
+                    "attachments": attachments_urls,
+                    "embeds": embeds_data
                 }
+                
                 try:
                     supabase.table("messages").insert(msg_data).execute()
                     total_saved += 1
-                except Exception:
-                    pass # Salta eventuali errori sul singolo messaggio senza bloccare tutto
+                    channel_messages_count += 1
+
+                    if total_saved % 10 == 0:
+                        try:
+                            await status_msg.edit(content=f"🔄 **Backup in corso...** Canale `#{channel.name}` ({index}/{format_channels})\n💾 Messaggi salvati finora: **{total_saved}**")
+                        except Exception:
+                            pass
+                except Exception as insert_err:
+                    print(f"Errore salvataggio singolo messaggio {message.id}: {insert_err}")
+            
+            print(f"Canale #{channel.name}: salvati {channel_messages_count} messaggi (inclusi bot).")
+        except discord.Forbidden:
+            print(f"Permesso negato per leggere il canale #{channel.name}")
         except Exception as e:
-            print(f"Errore nello storico del canale #{channel.name}: {e}")
+            print(f"Errore lettura canale #{channel.name}: {e}")
 
     try:
-        await status_msg.edit(content=f"✅ **Backup storico completato!** Canali analizzati: {format_channels}\n💾 Nuovi messaggi salvati: **{total_saved}**")
+        await status_msg.edit(content=f"✅ **Backup completato con successo!**\nCanali analizzati: `{format_channels}`\n💾 Totale messaggi salvati (utenti + bot): **{total_saved}**")
+        await user.send(f"🎉 **Operazione completata!** Tutti i messaggi (inclusi quelli dei bot), ruoli e canali sono stati salvati su Supabase.")
     except Exception:
         pass
 
-# --- COMANDO SLASH: /ripristina_tutto (Aggiornamenti in DM) ---
-@bot.tree.command(name="ripristina_tutto", description="Ricostruisce ruoli, categorie, canali e messaggi (Invia i progressi in DM)")
+# --- COMANDO SLASH: /ripristina_tutto ---
+@bot.tree.command(name="ripristina_tutto", description="Ricostruisce ruoli, categorie, canali e messaggi")
 @app_commands.describe(password="La password segreta di ripristino")
 @app_commands.checks.has_permissions(administrator=True)
 async def ripristina_tutto(interaction: discord.Interaction, password: str):
@@ -160,17 +182,16 @@ async def ripristina_tutto(interaction: discord.Interaction, password: str):
         await interaction.response.send_message("❌ **Password segreta errata!** Operazione negata.", ephemeral=True)
         return
 
-    await interaction.response.send_message("🚀 **Ripristino avviato!** Controlla i tuoi Messaggi Privati (DM) per seguire l'avanzamento.", ephemeral=True)
+    await interaction.response.send_message("🚀 **Ripristino totale avviato!** Controlla i tuoi Messaggi Privati (DM).", ephemeral=True)
 
     user = interaction.user
     guild = interaction.guild
 
     try:
-        status_msg = await user.send("🚀 **Avvio ripristino totale del server...** Ricostruzione ruoli in corso.")
+        status_msg = await user.send("🚀 **Avvio ripristino totale...** Ricostruzione ruoli in corso.")
     except Exception:
-        status_msg = await interaction.followup.send(f"⚠️ {user.mention}, non posso inviarti DM! Segui qui l'avanzamento: 🚀 **Avvio ripristino totale...**", ephemeral=False)
+        status_msg = await interaction.followup.send(f"⚠️ {user.mention}, non posso inviarti DM!", ephemeral=False)
 
-    # 1. RIPRISTINO RUOLI
     try:
         roles_res = supabase.table("roles").select("*").order("position", desc=False).execute()
         for r_data in roles_res.data:
@@ -183,14 +204,8 @@ async def ripristina_tutto(interaction: discord.Interaction, password: str):
             except Exception:
                 pass
     except Exception as e:
-        print(f"Errore recupero ruoli da Supabase: {e}")
+        print(f"Errore ripristino ruoli: {e}")
 
-    try:
-        await status_msg.edit(content="🚀 Ruoli ripristinati. Creazione categorie e canali in corso...")
-    except Exception:
-        pass
-
-    # 2. RIPRISTINO CATEGORIE E CANALI
     category_mapping = {} 
     text_channel_mapping = {} 
 
@@ -207,7 +222,7 @@ async def ripristina_tutto(interaction: discord.Interaction, password: str):
                     pass
 
         for c_data in channels_data:
-            if "text" in str(c_data["type"]).lower():
+            if "text" in str(c_data["type"]).lower() or "news" in str(c_data["type"]).lower():
                 cat_id = c_data.get("category_id")
                 target_category = category_mapping.get(cat_id) if cat_id in category_mapping else None
                 try:
@@ -215,22 +230,14 @@ async def ripristina_tutto(interaction: discord.Interaction, password: str):
                     text_channel_mapping[c_data["id"]] = new_channel
                 except Exception:
                     pass
-            elif "voice" in str(c_data["type"]).lower():
-                cat_id = c_data.get("category_id")
-                target_category = category_mapping.get(cat_id) if cat_id in category_mapping else None
-                try:
-                    await guild.create_voice_channel(name=c_data["name"], category=target_category)
-                except Exception:
-                    pass
     except Exception as e:
         print(f"Errore ripristino canali: {e}")
 
     try:
-        await status_msg.edit(content="🚀 Struttura creata. Inizio ripristino dei messaggi tramite webhook...")
+        await status_msg.edit(content="🚀 Struttura creata. Ripristino messaggi in corso...")
     except Exception:
         pass
 
-    # 3. RIPRISTINO MESSAGGI
     total_restored = 0
     webhook_cache = {}
 
@@ -256,10 +263,18 @@ async def ripristina_tutto(interaction: discord.Interaction, password: str):
                     continue
 
             webhook = webhook_cache[old_channel_id]
+            content_to_send = msg.get("content", "")
+            attachments = msg.get("attachments", [])
+            if attachments:
+                content_to_send += "\n" + "\n".join(attachments)
+
+            raw_embeds = msg.get("embeds", [])
+
             payload = {
-                "content": msg["content"],
+                "content": content_to_send if content_to_send else "[Contenuto multimediale]",
                 "username": msg["author_name"],
-                "avatar_url": msg["author_avatar"]
+                "avatar_url": msg["author_avatar"],
+                "embeds": raw_embeds
             }
 
             try:
@@ -267,37 +282,26 @@ async def ripristina_tutto(interaction: discord.Interaction, password: str):
                 total_restored += 1
                 if total_restored % 20 == 0:
                     try:
-                        await status_msg.edit(content=f"🚀 Ripristino messaggi in corso... ({total_restored} inviati)")
+                        await status_msg.edit(content=f"🚀 Ripristino in corso... ({total_restored} messaggi inviati)")
                     except Exception:
                         pass
                 await asyncio.sleep(0.4)
             except Exception:
                 pass
     except Exception as e:
-        print(f"Errore generale ripristino messaggi: {e}")
+        print(f"Errore ripristino messaggi: {e}")
 
     try:
-        await status_msg.edit(content=f"✅ **Ripristino totale completato!** Ruoli, categorie, canali e {total_restored} messaggi ripristinati.")
+        await status_msg.edit(content=f"✅ **Ripristino completato!** {total_restored} messaggi ripristinati.")
     except Exception:
         pass
 
-# Gestione errori permessi
-@avvia_backup.error
-async def avvia_backup_error(interaction: discord.Interaction, error):
-    if isinstance(error, app_commands.errors.MissingPermissions):
-        await interaction.response.send_message("❌ Devi essere amministratore per usare questo comando.", ephemeral=True)
-
-@ripristina_tutto.error
-async def ripristina_tutto_error(interaction: discord.Interaction, error):
-    if isinstance(error, app_commands.errors.MissingPermissions):
-        await interaction.response.send_message("❌ Devi essere amministratore per usare questo comando.", ephemeral=True)
-
-# --- EVENTI IN TEMPO REALE ---
+# --- EVENTI IN TEMPO REALE (Messaggi, Modifiche, Canali, Ruoli) ---
 
 @bot.event
 async def on_message(message: discord.Message):
-    if message.author.bot:
-        return
+    attachments_urls = [att.url for att in message.attachments] if message.attachments else []
+    embeds_data = [embed.to_dict() for embed in message.embeds] if message.embeds else []
 
     data = {
         "id": message.id,
@@ -305,19 +309,21 @@ async def on_message(message: discord.Message):
         "author_id": message.author.id,
         "author_name": message.author.display_name,
         "author_avatar": str(message.author.display_avatar.url),
-        "content": message.content or "[Allegato o vuoto]"
+        "content": message.content or "",
+        "attachments": attachments_urls,
+        "embeds": embeds_data
     }
     
     try:
         supabase.table("messages").insert(data).execute()
     except Exception as e:
-        print(f"Errore salvataggio messaggio in tempo reale: {e}")
+        print(f"Errore salvataggio realtime messaggio: {e}")
 
     await bot.process_commands(message)
 
 @bot.event
 async def on_message_update(before: discord.Message, after: discord.Message):
-    if before.author.bot or before.content == after.content:
+    if before.content == after.content:
         return
 
     try:
@@ -327,7 +333,7 @@ async def on_message_update(before: discord.Message, after: discord.Message):
             "new_content": after.content
         }).execute()
     except Exception as e:
-        print(f"Errore salvataggio modifica: {e}")
+        print(f"Errore salvataggio modifica messaggio: {e}")
 
 @bot.event
 async def on_guild_channel_create(channel: discord.abc.GuildChannel):
