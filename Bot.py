@@ -94,8 +94,24 @@ class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
         support_ping = f"<@&{SUPPORT_ROLE_ID}>" if SUPPORT_ROLE_ID else ""
         await ticket_channel.send(content=f"{interaction.user.mention} {support_ping}", embed=embed, view=close_view)
         
-        await interaction.followup.send(f"✅ Il tuo ticket è stato creato con successo: {ticket_channel.mention}", ephemeral=True)
+        # Invia il log di apertura nel canale log dedicato
+        log_channel = guild.get_channel(TICKET_LOG_CHANNEL_ID)
+        if log_channel:
+            log_embed = discord.Embed(
+                title="📂 Ticket Aperto",
+                description=(
+                    f"• **Utente:** {interaction.user.mention} (`{interaction.user.id}`)\n"
+                    f"• **Canale:** {ticket_channel.mention}\n"
+                    f"• **Quando bannato:** {self.when_banned.value}\n"
+                    f"• **Motivo ban:** {self.ban_reason.value}\n"
+                    f"• **Perché merita unban:** {self.why_deserve.value}"
+                ),
+                color=discord.Color.green(),
+                timestamp=discord.utils.utcnow()
+            )
+            await log_channel.send(embed=log_embed)
 
+        await interaction.followup.send(f"✅ Il tuo ticket è stato creato con successo: {ticket_channel.mention}", ephemeral=True)
 
 class UnbanSelect(discord.ui.Select):
     def __init__(self):
@@ -125,9 +141,40 @@ class TicketCloseView(discord.ui.View):
 
     @discord.ui.button(label="Chiudi Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🔒 Chiusura del ticket in corso...", ephemeral=True)
-        await interaction.channel.delete()
+        await interaction.response.send_message("🔒 Chiusura del ticket in corso e generazione del transcript...", ephemeral=True)
+        
+        guild = interaction.guild
+        channel = interaction.channel
+        closed_by = interaction.user
 
+        # Genera il transcript della chat
+        messages = [message async for message in channel.history(limit=None, oldest_first=True)]
+        transcript_content = f"--- TRANSCRIPT DEL TICKET: {channel.name} ---\nChiuso da: {closed_by} ({closed_by.id})\n\n"
+        
+        for msg in messages:
+            timestamp = msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            transcript_content += f"[{timestamp}] {msg.author}: {msg.content}\n"
+            if msg.embeds:
+                for embed in msg.embeds:
+                    transcript_content += f"  [EMBED] Titolo: {embed.title} | Descrizione: {embed.description}\n"
+
+        # Converte la stringa in un file binario leggibile da Discord
+        file_bytes = io.BytesIO(transcript_content.encode('utf-8'))
+        transcript_file = discord.File(file_bytes, filename=f"transcript-{channel.name}.txt")
+
+        # Invia il log e il transcript nel canale log
+        log_channel = guild.get_channel(TICKET_LOG_CHANNEL_ID)
+        if log_channel:
+            close_embed = discord.Embed(
+                title="🔒 Ticket Chiuso",
+                description=f"• **Canale:** #{channel.name}\n• **Chiuso da:** {closed_by.mention} (`{closed_by.id}`)",
+                color=discord.Color.red(),
+                timestamp=discord.utils.utcnow()
+            )
+            await log_channel.send(embed=close_embed, file=transcript_file)
+
+        # Elimina il canale del ticket
+        await channel.delete()
 
 # --- Sottoclasse del Bot per gestire correttamente la persistenza tramite setup_hook ---
 class PersistentBot(commands.Bot):
