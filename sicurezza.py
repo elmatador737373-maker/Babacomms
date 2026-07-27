@@ -322,8 +322,13 @@ class SettingsMainView(discord.ui.View):
 
     @discord.ui.button(label="Configura Canali Log", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
     async def log_channels_view(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = LogChannelsModal()
-        await interaction.response.send_modal(modal)
+        view = LogChannelSelectView()
+        embed = discord.Embed(
+            title="📋 Seleziona Categoria Log da Configurare",
+            description="Scegli dal menu a tendina quale tipo di log desideri associare a un canale.",
+            color=discord.Color.gold()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class GlobalWhitelistModal(discord.ui.Modal, title="Gestione Global Whitelist"):
@@ -383,36 +388,61 @@ class GlobalWhitelistModal(discord.ui.Modal, title="Gestione Global Whitelist"):
         )
 
 
-class LogChannelsModal(discord.ui.Modal, title="Imposta Canale Log"):
-    log_type = discord.ui.TextInput(
-        label="Tipo (messages, members, channels, roles, voice, security)",
-        placeholder="es. security",
-        required=True,
-        max_length=20
-    )
-    channel_id = discord.ui.TextInput(
-        label="ID del canale Discord",
-        placeholder="Inserisci l'ID numerico del canale...",
-        required=True,
-        max_length=25
-    )
+class LogChannelSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Messaggi (messages)", value="messages", description="Log eliminazione e modifica messaggi"),
+            discord.SelectOption(label="Membri (members)", value="members", description="Log ingressi, uscite, ban e timeout"),
+            discord.SelectOption(label="Canali (channels)", value="channels", description="Log creazione e rimozione canali"),
+            discord.SelectOption(label="Ruoli (roles)", value="roles", description="Log creazione e rimozione ruoli"),
+            discord.SelectOption(label="Vocali (voice)", value="voice", description="Log attività nei canali vocali"),
+            discord.SelectOption(label="Server (server)", value="server", description="Log generali di server"),
+            discord.SelectOption(label="Sicurezza (security)", value="security", description="Log di tutti i moduli di protezione"),
+        ]
+        super().__init__(placeholder="Seleziona la categoria di log...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
+        log_type = self.values[0]
+        modal = LogChannelIdModal(log_type)
+        await interaction.response.send_modal(modal)
+
+
+class LogChannelSelectView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(LogChannelSelect())
+
+
+class LogChannelIdModal(discord.ui.Modal, title="Imposta ID Canale Log"):
+    def __init__(self, log_type: str):
+        super().__init__()
+        self.log_type = log_type
+        
+        curr_id = config_data["log_channels"].get(log_type, "")
+        self.channel_id_input = discord.ui.TextInput(
+            label=f"ID del canale per '{log_type}'",
+            placeholder="Inserisci l'ID numerico esatto del canale...",
+            default=str(curr_id) if curr_id else "",
+            required=True,
+            max_length=25
+        )
+        self.add_item(self.channel_id_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
             
-        l_type = self.log_type.value.strip().lower()
-        if l_type not in config_data["log_channels"]:
-            return await interaction.response.send_message("❌ Tipo di log non valido.", ephemeral=True)
-            
         try:
-            ch_val = int(self.channel_id.value.strip())
+            ch_val = int(self.channel_id_input.value.strip())
         except ValueError:
-            return await interaction.response.send_message("❌ ID canale non valido.", ephemeral=True)
+            return await interaction.response.send_message("❌ ID canale non valido. Deve essere numerico.", ephemeral=True)
             
-        config_data["log_channels"][l_type] = ch_val
+        config_data["log_channels"][self.log_type] = ch_val
         discord.utils.run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
-        await interaction.response.send_message(f"✅ Canale log per `{l_type}` impostato su <#{ch_val}>!", ephemeral=True)
+        await interaction.response.send_message(f"✅ Canale log per `{self.log_type}` impostato con successo su <#{ch_val}>!", ephemeral=True)
 
 
 @bot.tree.command(name="settings", description="Apre il pannello di controllo completo e interattivo del bot")
