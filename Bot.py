@@ -203,7 +203,7 @@ bot = PersistentBot()
 async def on_member_join(member):
     channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
     if channel:
-        file = discord.File("benvenuto.png", filename="benvenuto.png")
+        file = discord.File("benvenuto.png", filename="file_00000000125c720a85fa9d73a34549c7.png")
         embed = discord.Embed(
             title="🎉 • ʙᴇɴᴠᴇɴᴜᴛᴏ",
             description=(
@@ -225,7 +225,7 @@ async def on_member_join(member):
 async def on_member_remove(member):
     channel = member.guild.get_channel(GOODBYE_CHANNEL_ID)
     if channel:
-        file = discord.File("addio.png", filename="addio.png")
+        file = discord.File("addio.png", filename="partenza.jpeg")
         embed = discord.Embed(
             title="✈️ • ᴘᴀʀᴛᴇɴᴢᴀ",
             description=(
