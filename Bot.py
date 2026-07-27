@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 from flask import Flask
 
-# --- Configurazione Flask (per tenere il bot attivo su hosting tipo Replit/Render) ---
+# --- Configurazione Flask (per tenere il bot attivo su Render) ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -15,7 +15,6 @@ def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
 # --- Configurazione Discord Bot ---
-# Usiamo all() per abilitare tutti gli intenti ed evitare blocchi di ricezione eventi
 intents = discord.Intents.all()
 
 # ID delle categorie, ruoli e canali inseriti
@@ -25,11 +24,6 @@ TICKET_LOG_CHANNEL_ID = 1494425912727572611  # ID del canale in cui inviare i lo
 WELCOME_CHANNEL_ID = 1352287128532418632     # ID del canale Benvenuto
 GOODBYE_CHANNEL_ID = 1494373723199901887     # ID del canale Arrivederci (Leave)
 
-
-@bot.command()
-async def testmember(ctx):
-    # Mostra quanti membri il bot vede attualmente nella sua cache interna
-    await ctx.send(f"👥 Membri totali cache bot nella gilda: {len(ctx.guild.members)}")
 
 # --- Modal per la richiesta di unban ---
 class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
@@ -60,13 +54,11 @@ class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
         guild = interaction.guild
         category = guild.get_channel(CATEGORY_TICKET_ID)
         
-        # Controlla se l'utente ha già un ticket aperto
         existing_channel = discord.utils.get(guild.text_channels, name=f"unban-{interaction.user.name.lower()}")
         if existing_channel:
             await interaction.followup.send(f"❌ Hai già un ticket aperto: {existing_channel.mention}", ephemeral=True)
             return
 
-        # Crea i permessi per il canale privato
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
@@ -78,11 +70,9 @@ class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
             if support_role:
                 overwrites[support_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-        # Crea il canale del ticket
         channel_name = f"unban-{interaction.user.name}"
         ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
 
-        # Messaggio di benvenuto nel ticket
         embed = discord.Embed(
             title="🔓 Richiesta di Unban - Madison",
             description=(
@@ -102,7 +92,6 @@ class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
         support_ping = f"<@&{SUPPORT_ROLE_ID}>" if SUPPORT_ROLE_ID else ""
         await ticket_channel.send(content=f"{interaction.user.mention} {support_ping}", embed=embed, view=close_view)
         
-        # Invia il log di apertura nel canale log dedicato
         log_channel = guild.get_channel(TICKET_LOG_CHANNEL_ID)
         if log_channel:
             log_embed = discord.Embed(
@@ -155,7 +144,6 @@ class TicketCloseView(discord.ui.View):
         channel = interaction.channel
         closed_by = interaction.user
 
-        # Genera il transcript della chat
         messages = [message async for message in channel.history(limit=None, oldest_first=True)]
         transcript_content = f"--- TRANSCRIPT DEL TICKET: {channel.name} ---\nChiuso da: {closed_by} ({closed_by.id})\n\n"
         
@@ -166,11 +154,9 @@ class TicketCloseView(discord.ui.View):
                 for embed in msg.embeds:
                     transcript_content += f"  [EMBED] Titolo: {embed.title} | Descrizione: {embed.description}\n"
 
-        # Converte la stringa in un file binario leggibile da Discord
         file_bytes = io.BytesIO(transcript_content.encode('utf-8'))
         transcript_file = discord.File(file_bytes, filename=f"transcript-{channel.name}.txt")
 
-        # Invia il log e il transcript nel canale log
         log_channel = guild.get_channel(TICKET_LOG_CHANNEL_ID)
         if log_channel:
             close_embed = discord.Embed(
@@ -181,11 +167,10 @@ class TicketCloseView(discord.ui.View):
             )
             await log_channel.send(embed=close_embed, file=transcript_file)
 
-        # Elimina il canale del ticket
         await channel.delete()
 
 
-# --- Configurazione del Bot con Viste Persistenti ---
+# --- Configurazione della Classe Bot ---
 class PersistentBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
@@ -203,6 +188,7 @@ class PersistentBot(commands.Bot):
         except Exception as e:
             print(f"Errore nella sincronizzazione dei comandi: {e}")
 
+# CREAZIONE DELL'ISTANZA BOT
 bot = PersistentBot()
 
 
@@ -288,6 +274,12 @@ async def on_member_remove(member):
         print(f"ERRORE CRITICO ARRIVEDERCI: {e}")
 
 
+# --- Comando di Test Membri ---
+@bot.command()
+async def testmember(ctx):
+    await ctx.send(f"👥 Membri totali visibili nella cache del bot: {len(ctx.guild.members)}")
+
+
 # --- Comando per inviare il pannello dei ticket ---
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -317,6 +309,7 @@ async def panel(ctx):
     view = UnbanDropView()
     await ctx.send(file=file, embed=embed, view=view)
     await ctx.message.delete()
+
 
 if __name__ == "__main__":
     import threading
