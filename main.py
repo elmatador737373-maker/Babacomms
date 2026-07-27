@@ -91,8 +91,8 @@ async def sync_guild_structure(guild: discord.Guild):
     except Exception as e:
         print(f"Errore sincronizzazione struttura server: {e}")
 
-# --- COMANDO SLASH: /avvia_backup ---
-@bot.tree.command(name="avvia_backup", description="Esegue il backup completo (inclusi messaggi di bot) in DM")
+# --- COMANDO SLASH: /avvia_backup (Con Debug Ultra-Dettagliato) ---
+@bot.tree.command(name="avvia_backup", description="Esegue il backup completo con debug avanzato")
 @app_commands.describe(password="La password segreta per avviare il backup")
 @app_commands.checks.has_permissions(administrator=True)
 async def avvia_backup(interaction: discord.Interaction, password: str):
@@ -100,37 +100,91 @@ async def avvia_backup(interaction: discord.Interaction, password: str):
         await interaction.response.send_message("❌ **Password segreta errata!** Operazione negata.", ephemeral=True)
         return
 
-    await interaction.response.send_message("🔄 **Backup avviato!** Controlla i tuoi Messaggi Privati (DM).", ephemeral=True)
+    await interaction.response.send_message("🔍 **Backup con Debug avviato!** Controlla i tuoi Messaggi Privati (DM).", ephemeral=True)
 
     user = interaction.user
     guild = interaction.guild
 
     try:
-        status_msg = await user.send("🔄 **Inizializzazione backup in corso...**")
+        status_msg = await user.send("🔍 **[DEBUG] Inizializzazione comando in corso...**")
     except Exception:
         status_msg = await interaction.followup.send(f"⚠️ {user.mention}, non posso inviarti DM! Segui qui l'avanzamento.", ephemeral=False)
 
-    await sync_guild_structure(guild)
+    print(f"\n================ [DEBUG BACKUP AVVIATO] ================")
+    print(f"[DEBUG] Server: {guild.name} (ID: {guild.id})")
+    print(f"[DEBUG] Utente richiedente: {user} (ID: {user.id})")
+
+    # 1. TEST CONNESSIONE SUPABASE
+    try:
+        await status_msg.edit(content="🔍 **[DEBUG] Test connessione a Supabase...**")
+        print(f"[DEBUG] Test connessione a Supabase in corso...")
+        test_res = supabase.table("roles").select("id", count="exact").limit(1).execute()
+        print(f"[DEBUG] Connessione a Supabase riuscita! Tabella roles raggiungibile.")
+    except Exception as db_test_err:
+        print(f"[DEBUG ERRORE CRITICO SUPABASE] Impossibile connettersi al database: {db_test_err}")
+        await status_msg.edit(content=f"❌ **[DEBUG ERRORE]** Connessione a Supabase fallita: `{db_test_err}`")
+        return
+
+    # 2. SINCRONIZZAZIONE STRUTTURA
+    try:
+        await status_msg.edit(content="🔍 **[DEBUG] Sincronizzazione ruoli e canali...**")
+        print(f"[DEBUG] Avvio sync_guild_structure...")
+        await sync_guild_structure(guild)
+        print(f"[DEBUG] sync_guild_structure completato con successo.")
+    except Exception as sync_err:
+        print(f"[DEBUG ERRORE] Errore durante la sincronizzazione della struttura: {sync_err}")
+
+    # 3. FILTRAGGIO CANALI
+    try:
+        await status_msg.edit(content="🔍 **[DEBUG] Filtraggio canali del server...**")
+        all_guild_channels = guild.channels
+        print(f"[DEBUG] Canali totali grezzi nel server: {len(all_guild_channels)}")
+        
+        text_channels = [c for c in guild.channels if c.type in (discord.ChannelType.text, discord.ChannelType.news)]
+        format_channels = len(text_channels)
+        print(f"[DEBUG] Canali di testo/annunci filtrati idonei: {format_channels}")
+        
+        for c in text_channels:
+            print(f"   -> Canale trovato: #{c.name} (ID: {c.id}, Tipo: {c.type})")
+
+        await user.send(f"📁 **[DEBUG]** Canali totali: `{len(all_guild_channels)}` | Canali di testo validi da scansionare: `{format_channels}`")
+    except Exception as chan_err:
+        print(f"[DEBUG ERRORE] Errore nel filtraggio canali: {chan_err}")
+        await status_msg.edit(content=f"❌ **[DEBUG ERRORE]** Filtraggio canali fallito: `{chan_err}`")
+        return
+
+    if format_channels == 0:
+        print(f"[DEBUG ATTENZIONE] Nessun canale di testo trovato.")
+        await status_msg.edit(content="⚠️ **[DEBUG]** Nessun canale di testo o annuncio trovato da scansionare!")
+        return
 
     total_saved = 0
-    text_channels = [c for c in guild.channels if c.type in (discord.ChannelType.text, discord.ChannelType.news)]
-    format_channels = len(text_channels)
-    
-    print(f"[BACKUP] Canali trovati da scansionare: {format_channels}")
 
+    # 4. SCANSIONE MESSAGGI
     for index, channel in enumerate(text_channels, start=1):
-        print(f"-> Analisi canale #{channel.name} ({index}/{format_channels})")
-        
+        print(f"\n--- [DEBUG] INIZIO CANALE #{channel.name} ({index}/{format_channels}) ---")
+        try:
+            await status_msg.edit(content=f"🔄 **Backup in corso...** Canale `#{channel.name}` ({index}/{format_channels})\n💾 Salvati finora: **{total_saved}**")
+        except Exception:
+            pass
+
         try:
             existing_res = supabase.table("messages").select("id").eq("channel_id", channel.id).execute()
             existing_ids = {row["id"] for row in existing_res.data}
-        except Exception:
+            print(f"[DEBUG] Messaggi già presenti nel DB per #{channel.name}: {len(existing_ids)}")
+        except Exception as db_read_err:
+            print(f"[DEBUG ERRORE] Impossibile leggere i messaggi esistenti da Supabase per #{channel.name}: {db_read_err}")
             existing_ids = set()
 
         channel_messages_count = 0
+        messages_read_in_channel = 0
 
         try:
             async for message in channel.history(limit=None, oldest_first=True):
+                messages_read_in_channel += 1
+                if messages_read_in_channel <= 3:  # Logga i primi 3 messaggi per ogni canale
+                    print(f"   [DEBUG MSG] Letto ID {message.id} | Autore: {message.author} | Contenuto: {repr(message.content[:20])}")
+
                 if message.id in existing_ids:
                     continue
 
@@ -152,26 +206,69 @@ async def avvia_backup(interaction: discord.Interaction, password: str):
                     supabase.table("messages").insert(msg_data).execute()
                     total_saved += 1
                     channel_messages_count += 1
-
-                    if total_saved % 10 == 0:
-                        try:
-                            await status_msg.edit(content=f"🔄 **Backup in corso...** Canale `#{channel.name}` ({index}/{format_channels})\n💾 Messaggi salvati finora: **{total_saved}**")
-                        except Exception:
-                            pass
                 except Exception as insert_err:
-                    print(f"Errore salvataggio singolo messaggio {message.id}: {insert_err}")
+                    print(f"   [DEBUG ERRORE INSERT] Fallito inserimento messaggio ID {message.id}: {insert_err}")
             
-            print(f"Canale #{channel.name}: salvati {channel_messages_count} messaggi (inclusi bot).")
+            print(f"[DEBUG] Fine canale #{channel.name}: Letti {messages_read_in_channel} messaggi, Salvati {channel_messages_count} nuovi messaggi.")
         except discord.Forbidden:
-            print(f"Permesso negato per leggere il canale #{channel.name}")
+            print(f"❌ [DEBUG ERRORE PERMESSO] Il bot non ha i permessi di lettura per il canale #{channel.name}")
+            try:
+                await user.send(f"❌ **Permesso negato** per leggere il canale `#{channel.name}`.")
+            except Exception:
+                pass
         except Exception as e:
-            print(f"Errore lettura canale #{channel.name}: {e}")
+            print(f"❌ [DEBUG ERRORE CRITICO] Errore lettura cronologia #{channel.name}: {e}")
+
+    print(f"\n================ [DEBUG BACKUP TERMINATO] ================")
+    print(f"[DEBUG] Totale complessivo messaggi salvati: {total_saved}")
 
     try:
-        await status_msg.edit(content=f"✅ **Backup completato con successo!**\nCanali analizzati: `{format_channels}`\n💾 Totale messaggi salvati (utenti + bot): **{total_saved}**")
-        await user.send(f"🎉 **Operazione completata!** Tutti i messaggi (inclusi quelli dei bot), ruoli e canali sono stati salvati su Supabase.")
+        await status_msg.edit(content=f"✅ **Backup e Debug completati con successo!**\nCanali analizzati: `{format_channels}`\n💾 Totale messaggi salvati: **{total_saved}**")
+        await user.send(f"🎯 **[DEBUG RIEPILOGO]** Operazione completata senza crash. Controlla i log di Render per i dettagli completi.")
     except Exception:
         pass
+
+# --- COMANDO SLASH: /verifica_db (Verifica lo stato della connessione a Supabase) ---
+@bot.tree.command(name="verifica_db", description="Verifica lo stato della connessione e la lettura delle tabelle su Supabase")
+@app_commands.checks.has_permissions(administrator=True)
+async def verifica_db(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    
+    status_text = "🔄 **Test di connessione a Supabase in corso...**"
+    await interaction.followup.send(status_text, ephemeral=True)
+
+    try:
+        # Test tabella roles
+        roles_res = supabase.table("roles").select("id", count="exact").execute()
+        roles_count = roles_res.count if hasattr(roles_res, 'count') else len(roles_res.data)
+
+        # Test tabella channels
+        channels_res = supabase.table("channels").select("id", count="exact").execute()
+        channels_count = channels_res.count if hasattr(channels_res, 'count') else len(channels_res.data)
+
+        # Test tabella messages
+        messages_res = supabase.table("messages").select("id", count="exact").execute()
+        messages_count = messages_res.count if hasattr(messages_res, 'count') else len(messages_res.data)
+
+        success_msg = (
+            "✅ **Connessione a Supabase stabilita con successo!**\n\n"
+            f"📊 **Statistiche database attuali:**\n"
+            f"• Ruoli salvati: `{roles_count}`\n"
+            f"• Canali salvati: `{channels_count}`\n"
+            f"• Messaggi salvati: `{messages_count}`"
+        )
+        await interaction.edit_original_response(content=success_msg)
+        print("[DEBUG] Comando /verifica_db eseguito con successo: Database online.")
+
+    except Exception as e:
+        error_msg = f"❌ **Errore di connessione a Supabase!**\nDettagli:\n`{e}`"
+        await interaction.edit_original_response(content=error_msg)
+        print(f"[DEBUG ERRORE] /verifica_db fallito: {e}")
+
+@verifica_db.error
+async def verifica_db_error(interaction: discord.Interaction, error):
+    if isinstance(error, app_commands.errors.MissingPermissions):
+        await interaction.response.send_message("❌ Devi essere amministratore per usare questo comando.", ephemeral=True)
 
 # --- COMANDO SLASH: /ripristina_tutto ---
 @bot.tree.command(name="ripristina_tutto", description="Ricostruisce ruoli, categorie, canali e messaggi")
