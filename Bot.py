@@ -217,7 +217,7 @@ async def on_member_join(member):
             ),
             color=discord.Color.green()
         )
-        embed.set_image(url="attachment://benvenuto.png")
+        embed.set_image(url="attachment://file_00000000125c720a85fa9d73a34549c7.png")
         await channel.send(file=file, embed=embed)
 
 
