@@ -248,20 +248,22 @@ async def on_member_remove(member):
 async def panel(ctx):
     file = discord.File("pannello.png", filename="pannello.png")
     
+     file = discord.File("pannello.png", filename="pannello.png")
+    
     embed = discord.Embed(
-        title="Madison Unban",
+        title="<:MadisonStateUnban:1494380677389488237> • MADISON PANELLO SBAN",
         description=(
-            "👋 **Benvenuto nel pannello dedicato alle richieste di Unban, ricorda:** ⚠️\n\n"
+            "👋 **Benvenuto nel pannello dedicato alle richieste di Unban, ricorda:** ⚠️\n"
             "• **Niente ticket troll.**\n"
             "• **Solo richieste di Unban.**\n"
             "• **Non aprire più ticket per la stessa sanzione.**\n"
             "• **Mantieni sempre rispetto verso lo Staff.**\n"
             "• **Fornisci informazioni veritiere.**\n\n"
-            "📌 **Una seconda possibilità non viene regalata, si conquista.**\n"
-            "📌 **Ogni errore può diventare un'opportunità per migliorare.**\n\n"
-            "🔓 **Se ritieni che il ban debba essere rivalutato, spiega la situazione con sincerità e attenzione.**\n"
-            "📩 **Seleziona dal menù qui sotto per aprire una richiesta.**\n\n"
-            "<:MadisonStateUnban:1494380677389488237> *Dimostra chi sei oggi, non chi eri ieri.*"
+            "📌 *Una seconda possibilità non viene regalata, si conquista.*\n"
+            "📌 *Ogni errore può diventare un'opportunità per migliorare.*\n"
+            "🔓 *Se ritieni che il ban debba essere rivalutato, spiega la situazione con sincerità e attenzione.*\n"
+            "📩 *Seleziona dal menù qui sotto per aprire una richiesta.*\n\n"
+            "🔎 *Dimostra chi sei oggi, non chi eri ieri.*"
         ),
         color=discord.Color.from_rgb(43, 45, 49)
     )
@@ -271,7 +273,6 @@ async def panel(ctx):
     view = UnbanDropView()
     await ctx.send(file=file, embed=embed, view=view)
     await ctx.message.delete()
-
 
 if __name__ == "__main__":
     import threading
