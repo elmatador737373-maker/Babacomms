@@ -261,7 +261,7 @@ async def panel(ctx):
             "📌 **Ogni errore può diventare un'opportunità per migliorare.**\n\n"
             "🔓 **Se ritieni che il ban debba essere rivalutato, spiega la situazione con sincerità e attenzione.**\n"
             "📩 **Seleziona dal menù qui sotto per aprire una richiesta.**\n\n"
-            "ServerUnban: *Dimostra chi sei oggi, non chi eri ieri.*"
+            ":MadisonStateUnban: *Dimostra chi sei oggi, non chi eri ieri.*"
         ),
         color=discord.Color.from_rgb(43, 45, 49)
     )
