@@ -1082,6 +1082,89 @@ async def apply_generic_action(guild: discord.Guild, member: discord.Member, act
         return f"Errore esecuzione: {e}"
     return "Nessuna azione eseguita"
 
+# 5-bis. RUOLI: AGGIUNTA E RIMOZIONE AI MEMBRI (CON MODERATORE)
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+  if before.roles == after.roles:
+    return
+
+  guild = after.guild
+  added_roles = [r for r in after.roles if r not in before.roles]
+  removed_roles = [r for r in before.roles if r not in after.roles]
+
+  if not added_roles and not removed_roles:
+    return
+
+  # Cerca se c'è un moderatore nei log di audit recente
+  moderator = None
+  try:
+    async for entry in guild.audit_logs(
+        limit=5, action=discord.AuditLogAction.member_role_update
+    ):
+      if entry.target and entry.target.id == after.id:
+        if (discord.utils.utcnow() - entry.created_at).total_seconds() < 10:
+          moderator = entry.user
+          break
+  except Exception:
+    pass
+
+  # Gestione Ruoli Aggiunti
+  if added_roles:
+    embed = discord.Embed(
+        title='🏷️ Registro Membri — Ruolo Assegnato',
+        color=discord.Color.from_rgb(46, 204, 113),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.set_thumbnail(url=after.display_avatar.url)
+    embed.add_field(
+        name='👤 Utente', value=f'{after.mention}\n`{after}`', inline=True
+    )
+    embed.add_field(name='🆔 ID', value=f'`{after.id}`', inline=True)
+
+    roles_str = ', '.join([r.mention for r in added_roles])
+    embed.add_field(
+        name=f'➕ Ruolo/i Aggiunto/i ({len(added_roles)})',
+        value=roles_str,
+        inline=False,
+    )
+
+    if moderator:
+      embed.add_field(
+          name='👮 Moderatore Responsabile',
+          value=f'{moderator.mention}\n`ID: {moderator.id}`',
+          inline=False,
+      )
+
+    await send_typed_log(guild, 'roles', embed)
+
+  # Gestione Ruoli Rimossi
+  if removed_roles:
+    embed = discord.Embed(
+        title='🏷️ Registro Membri — Ruolo Rimosso',
+        color=discord.Color.from_rgb(231, 76, 60),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.set_thumbnail(url=after.display_avatar.url)
+    embed.add_field(
+        name='👤 Utente', value=f'{after.mention}\n`{after}`', inline=True
+    )
+    embed.add_field(name='🆔 ID', value=f'`{after.id}`', inline=True)
+
+    roles_str = ', '.join([r.mention for r in removed_roles])
+    embed.add_field(
+        name=f'➖ Ruolo/i Rimosso/i ({len(removed_roles)})',
+        value=roles_str,
+        inline=False,
+    )
+
+    if moderator:
+      embed.add_field(
+          name='👮 Moderatore Responsabile',
+          value=f'{moderator.mention}\n`ID: {moderator.id}`',
+          inline=False,
+      )
+
+    await send_typed_log(guild, 'roles', embed)
 
 @bot.event
 async def on_message(message: discord.Message):
