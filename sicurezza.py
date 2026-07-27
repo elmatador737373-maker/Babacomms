@@ -531,28 +531,54 @@ async def on_guild_role_delete(role: discord.Role):
     
     await send_typed_log(role.guild, "roles", embed)
 
-
-# 5. VOCALI: SPOSTAMENTI E CONNESSIONI
+# 5. VOCALI: SPOSTAMENTI, CONNESSIONI E DISCONNESSIONI DETTAGLIATE
 @bot.event
-async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-    if member.bot:
-        return
-        
-    guild = member.guild
-    if before.channel is None and after.channel is not None:
-        embed = discord.Embed(title="🔊 Attività Vocale — Entrato", color=discord.Color.from_rgb(52, 152, 219), timestamp=discord.utils.utcnow())
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="👤 Utente", value=f"{member.mention}", inline=True)
-        embed.add_field(name="🎙️ Canale Vocale", value=f"`{after.channel.name}`", inline=True)
-        await send_typed_log(guild, "voice", embed)
-        
-    elif before.channel is not None and after.channel is None:
-        embed = discord.Embed(title="🔇 Attività Vocale — Uscito", color=discord.Color.from_rgb(127, 140, 141), timestamp=discord.utils.utcnow())
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="👤 Utente", value=f"{member.mention}", inline=True)
-        embed.add_field(name="🎙️ Canale Precedente", value=f"`{before.channel.name}`", inline=True)
-        await send_typed_log(guild, "voice", embed)
-        
+async def on_voice_state_update(
+    member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+):
+  if member.bot:
+    return
+
+  guild = member.guild
+
+  # Connessione a un canale vocale
+  if before.channel is None and after.channel is not None:
+    embed = discord.Embed(
+        title='🔊 Attività Vocale — Connessione',
+        color=discord.Color.from_rgb(52, 152, 219),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.add_field(
+        name='👤 Utente',
+        value=f'{member.mention}\n`{member}`',
+        inline=True,
+    )
+    embed.add_field(
+        name='🎙️ Canale Vocale', value=f'`{after.channel.name}`', inline=True
+    )
+    await send_typed_log(guild, 'voice', embed)
+
+  # Disconnessione da un canale vocale
+  elif before.channel is not None and after.channel is None:
+    embed = discord.Embed(
+        title='🔇 Attività Vocale — Disconnessione',
+        color=discord.Color.from_rgb(127, 140, 141),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.add_field(
+        name='👤 Utente',
+        value=f'{member.mention}\n`{member}`',
+        inline=True,
+    )
+    embed.add_field(
+        name='🎙️ Canale Precedente',
+        value=f'`{before.channel.name}`',
+        inline=True,
+    )
+    await send_typed_log(guild, 'voice', embed)
+
   # Spostamento da un canale vocale all'altro
   elif (
       before.channel is not None
@@ -591,6 +617,53 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
       )
 
     await send_typed_log(guild, 'voice', embed)
+
+  # Variazione Stati Mutamento Vocale (Mute/Deafen)
+  elif before.channel is not None and after.channel is not None:
+    status_changes = []
+    if before.self_mute != after.self_mute:
+      status_changes.append(
+          'Microfono Mutato' if after.self_mute else 'Microfono Smutato'
+      )
+    if before.self_deaf != after.self_deaf:
+      status_changes.append(
+          'Audio Sordina' if after.self_deaf else 'Audio Dissordina'
+      )
+    if before.mute != after.mute:
+      status_changes.append(
+          'Muto Server Applicato'
+          if after.mute
+          else 'Muto Server Rimosso'
+      )
+    if before.deaf != after.deaf:
+      status_changes.append(
+          'Sordo Server Applicato'
+          if after.deaf
+          else 'Sordo Server Rimosso'
+      )
+
+    if status_changes:
+      embed = discord.Embed(
+          title='🎧 Attività Vocale — Stato Modificato',
+          color=discord.Color.from_rgb(241, 196, 15),
+          timestamp=discord.utils.utcnow(),
+      )
+      embed.set_thumbnail(url=member.display_avatar.url)
+      embed.add_field(
+          name='👤 Utente',
+          value=f'{member.mention}\n`{member}`',
+          inline=True,
+      )
+      embed.add_field(
+          name='🎙️ Canale', value=f'`{after.channel.name}`', inline=True
+      )
+      embed.add_field(
+          name='⚙️ Modifiche Stato',
+          value='\n'.join([f'• {change}' for change in status_changes]),
+          inline=False,
+      )
+      await send_typed_log(guild, 'voice', embed)
+
 
 # ==========================================
 # 🎛️ PANNELLO DI SETTING INTERATTIVO (DB FIRST)
