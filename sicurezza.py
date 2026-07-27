@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 import os
-import json
 import time
 from collections import defaultdict
 from supabase import create_client, Client
@@ -33,7 +32,6 @@ TOKEN = os.getenv("DISCORD_TOKEN") or "IL_TUO_TOKEN_QUI"
 SUPABASE_URL = os.getenv("SUPABASE_URL") or "IL_TUO_SUPABASE_URL"
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or "IL_TUO_SUPABASE_ANON_KEY"
 
-# Inizializzazione client Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 intents = discord.Intents.default()
@@ -48,152 +46,107 @@ intents.invites = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Configurazione globale predefinita (usata solo se il database è vuoto)
-DEFAULT_CONFIG = {
-    "security": {
-        "anti_link": {
-            "enabled": True,
-            "action": "delete",
-            "timeout_minutes": 1,
-            "whitelist_users": [],
-            "whitelist_roles": []
-        },
-        "anti_invite": {
-            "enabled": True,
-            "action": "timeout",
-            "timeout_minutes": 5,
-            "whitelist_users": [],
-            "whitelist_roles": []
-        },
-        "anti_spam": {
-            "enabled": True,
-            "action": "timeout",
-            "timeout_minutes": 1,
-            "whitelist_users": [],
-            "whitelist_roles": []
-        },
-        "anti_bot_add": {
-            "enabled": True,
-            "action": "kick",
-            "whitelist_users": []
-        },
-        "anti_role_create": {
-            "enabled": True,
-            "action": "delete",
-            "whitelist_users": [],
-            "whitelist_roles": []
-        },
-        "anti_role_delete": {
-            "enabled": True,
-            "action": "kick",
-            "whitelist_users": [],
-            "whitelist_roles": []
-        },
-        "anti_dangerous_role": {
-            "enabled": True,
-            "action": "remove_perms",
-            "whitelist_users": [],
-            "whitelist_roles": []
-        },
-        "anti_channel_create": {
-            "enabled": True,
-            "action": "delete",
-            "whitelist_users": [],
-            "whitelist_roles": []
-        },
-        "anti_channel_delete": {
-            "enabled": True,
-            "action": "kick",
-            "whitelist_users": [],
-            "whitelist_roles": []
-        }
-    },
-    "log_channels": {
-        "messages": None,
-        "members": None,
-        "channels": None,
-        "roles": None,
-        "voice": None,
-        "server": None,
-        "security": None
-    }
+DEFAULT_SECURITY_CONFIG = {
+    "anti_link": {"enabled": True, "action": "delete", "timeout_minutes": 1},
+    "anti_invite": {"enabled": True, "action": "timeout", "timeout_minutes": 5},
+    "anti_spam": {"enabled": True, "action": "timeout", "timeout_minutes": 1},
+    "anti_bot_add": {"enabled": True, "action": "kick"},
+    "anti_role_create": {"enabled": True, "action": "delete"},
+    "anti_role_delete": {"enabled": True, "action": "kick"},
+    "anti_dangerous_role": {"enabled": True, "action": "remove_perms"},
+    "anti_channel_create": {"enabled": True, "action": "delete"},
+    "anti_channel_delete": {"enabled": True, "action": "kick"}
 }
 
-config_data = {}
+DEFAULT_LOG_CHANNELS = {
+    "messages": None, "members": None, "channels": None,
+    "roles": None, "voice": None, "server": None, "security": None
+}
+
 spam_tracker = defaultdict(list)
 
 
 # ==========================================
-# 🗄️ GESTIONE CONFIGURAZIONI SU SUPABASE
+# 🗄️ GESTIONE DATABASE SUPABASE
 # ==========================================
 
-async def load_config_from_supabase():
-    global config_data
+async def load_settings_from_db():
+    """Carica o inizializza le impostazioni da Supabase"""
     try:
-        response = supabase.table("bot_settings").select("*").execute()
-        data = response.data
+        res_sec = supabase.table("bot_settings").select("*").eq("key", "security").execute()
+        if not res_sec.data:
+            supabase.table("bot_settings").upsert({"key": "security", "value": DEFAULT_SECURITY_CONFIG}).execute()
         
-        if data and len(data) > 0:
-            db_config = {}
-            for row in data:
-                db_config[row["key"]] = row["value"]
-            config_data = db_config
-            print("⚙️ Configurazioni caricate con successo da Supabase.")
-        else:
-            print("⚙️ Tabella Supabase vuota, inizializzazione con i valori predefiniti...")
-            config_data = DEFAULT_CONFIG.copy()
-            await save_config_to_supabase()
+        res_log = supabase.table("bot_settings").select("*").eq("key", "log_channels").execute()
+        if not res_log.data:
+            supabase.table("bot_settings").upsert({"key": "log_channels", "value": DEFAULT_LOG_CHANNELS}).execute()
+            
+        print("⚙️ Configurazioni caricate con successo dal Database Supabase.")
     except Exception as e:
-        print(f"[ERRORE CARICAMENTO SUPABASE]: {e}")
-        config_data = DEFAULT_CONFIG.copy()
+        print(f"[ERRORE CARICAMENTO DB]: {e}")
 
-async def save_config_to_supabase():
+def get_db_security():
     try:
-        for key, value in config_data.items():
-            supabase.table("bot_settings").upsert({
-                "key": key,
-                "value": value
-            }, on_conflict="key").execute()
-        print("⚙️ Configurazioni salvate con successo su Supabase.")
+        res = supabase.table("bot_settings").select("value").eq("key", "security").execute()
+        if res.data:
+            return res.data[0]["value"]
+    except Exception:
+        pass
+    return DEFAULT_SECURITY_CONFIG
+
+def save_db_security(data):
+    try:
+        supabase.table("bot_settings").upsert({"key": "security", "value": data}).execute()
     except Exception as e:
-        print(f"[ERRORE SALVATAGGIO SUPABASE]: {e}")
+        print(f"[ERRORE SALVATAGGIO SECURITY DB]: {e}")
+
+def get_db_log_channels():
+    try:
+        res = supabase.table("bot_settings").select("value").eq("key", "log_channels").execute()
+        if res.data:
+            return res.data[0]["value"]
+    except Exception:
+        pass
+    return DEFAULT_LOG_CHANNELS
+
+def save_db_log_channels(data):
+    try:
+        supabase.table("bot_settings").upsert({"key": "log_channels", "value": data}).execute()
+    except Exception as e:
+        print(f"[ERRORE SALVATAGGIO LOGS DB]: {e}")
+
+
+# --- FUNZIONI WHITELIST DATABASE ---
+
+def is_whitelisted_db(member: discord.Member) -> bool:
+    if not member:
+        return False
+    if member.guild_permissions.administrator:
+        return True
+    try:
+        res = supabase.table("bot_whitelist").select("id").execute()
+        if res.data:
+            whitelist_ids = [row["id"] for row in res.data]
+            if member.id in whitelist_ids:
+                return True
+            for role in member.roles:
+                if role.id in whitelist_ids:
+                    return True
+    except Exception:
+        pass
+    return False
 
 
 @bot.event
 async def on_ready():
     print(f"Bot online come {bot.user} (ID: {bot.user.id})")
-    await load_config_from_supabase()
+    await load_settings_from_db()
     try:
         synced = await bot.tree.sync()
         print(f"Comandi Slash sincronizzati: {len(synced)}")
     except Exception as e:
         print(f"Errore nella sincronizzazione dei comandi: {e}")
 
-
-# ==========================================
-# 🎨 STYLING & INVIO LOG SPECIFICO (MADISON STATE)
-# ==========================================
-
-async def send_typed_log(guild: discord.Guild, log_type: str, embed: discord.Embed):
-    log_channels_dict = config_data.get("log_channels", {})
-    channel_id = log_channels_dict.get(log_type) or log_channels_dict.get("security" if log_type == "security" else "server")
-    if not channel_id:
-        return
-    channel = guild.get_channel(channel_id)
-    if channel:
-        try:
-            embed.set_footer(
-                text=f"Madison State • Security & Logs System", 
-                icon_url=guild.icon.url if guild.icon else None
-            )
-            await channel.send(embed=embed)
-        except Exception:
-            pass
-
-
-# ==========================================
-# 🔒 CONTROLLO PRIVILEGI PROPRIETARIO
-# ==========================================
 
 async def is_owner_or_guild_owner(interaction: discord.Interaction) -> bool:
     if not interaction.guild:
@@ -204,7 +157,239 @@ async def is_owner_or_guild_owner(interaction: discord.Interaction) -> bool:
 
 
 # ==========================================
-# 🎛️ PANNELLO DI SETTING INTERATTIVO
+# 🌟 SISTEMA LOG AVANZATO & SPETTACOLARE
+# ==========================================
+
+async def send_typed_log(guild: discord.Guild, log_type: str, embed: discord.Embed):
+    log_channels_dict = get_db_log_channels()
+    channel_id = log_channels_dict.get(log_type) or log_channels_dict.get("security" if log_type == "security" else "server")
+    if not channel_id:
+        return
+    channel = guild.get_channel(channel_id)
+    if channel:
+        try:
+            embed.set_footer(
+                text="Madison State Security & Logs", 
+                icon_url=guild.icon.url if guild.icon else None
+            )
+            await channel.send(embed=embed)
+        except Exception:
+            pass
+
+
+# 1. MESSAGGI: ELIMINAZIONE & MODIFICA
+@bot.event
+async def on_message_delete(message: discord.Message):
+    if not message.guild or message.author.bot:
+        return
+    
+    embed = discord.Embed(
+        title="🗑️ Registro Eventi — Messaggio Eliminato", 
+        color=discord.Color.from_rgb(231, 76, 60), 
+        timestamp=discord.utils.utcnow()
+    )
+    if message.author.avatar:
+        embed.set_thumbnail(url=message.author.display_avatar.url)
+        
+    embed.add_field(name="👤 Autore", value=f"{message.author.mention}\n`ID: {message.author.id}`", inline=True)
+    embed.add_field(name="📍 Canale", value=message.channel.mention, inline=True)
+    
+    content = message.content or "*[Nessun testo / Contenuto multimediale o allegato]*"
+    if len(content) > 1024: 
+        content = content[:1021] + "..."
+    embed.add_field(name="💬 Testo del Messaggio", value=f"```{content}```", inline=False)
+    
+    await send_typed_log(message.guild, "messages", embed)
+
+
+@bot.event
+async def on_message_edit(before: discord.Message, after: discord.Message):
+    if not before.guild or before.author.bot or before.content == after.content:
+        return
+        
+    embed = discord.Embed(
+        title="✏️ Registro Eventi — Messaggio Modificato", 
+        color=discord.Color.from_rgb(241, 196, 15), 
+        timestamp=discord.utils.utcnow()
+    )
+    if before.author.avatar:
+        embed.set_thumbnail(url=before.author.display_avatar.url)
+        
+    embed.add_field(name="👤 Autore", value=f"{before.author.mention}\n`ID: {before.author.id}`", inline=True)
+    embed.add_field(name="📍 Canale", value=before.channel.mention, inline=True)
+    
+    old_c = before.content or "*[Vuoto]*"
+    new_c = after.content or "*[Vuoto]*"
+    if len(old_c) > 500: old_c = old_c[:497] + "..."
+    if len(new_c) > 500: new_c = new_c[:497] + "..."
+    
+    embed.add_field(name="📜 Prima della modifica", value=f"```{old_c}```", inline=False)
+    embed.add_field(name="✨ Dopo la modifica", value=f"```{new_c}```", inline=False)
+    
+    await send_typed_log(before.guild, "messages", embed)
+
+
+# 2. MEMBRI: INGRESSI, USCITE, BAN
+@bot.event
+async def on_member_join(member: discord.Member):
+    if member.bot:
+        sec = get_db_security().get("anti_bot_add", {})
+        if sec.get("enabled"):
+            guild = member.guild
+            adder = None
+            try:
+                async for entry in guild.audit_logs(limit=3, action=discord.AuditLogAction.bot_add):
+                    if entry.target.id == member.id:
+                        adder = entry.user
+                        break
+            except:
+                pass
+
+            if adder and not (adder.guild_permissions.administrator or is_whitelisted_db(adder)):
+                action = sec.get("action", "kick")
+                action_desc = await apply_generic_action(guild, adder, action, "Aggiunta bot non autorizzata")
+                try:
+                    await member.kick(reason="Bot aggiunto senza autorizzazione")
+                except:
+                    pass
+
+                embed = discord.Embed(title="🚨 Madison Security — Bot Non Autorizzato", color=discord.Color.from_rgb(204, 41, 41), timestamp=discord.utils.utcnow())
+                embed.set_thumbnail(url=member.display_avatar.url)
+                embed.add_field(name="🤖 Bot Rilevato", value=f"{member} (`{member.id}`)", inline=False)
+                embed.add_field(name="👤 Aggiunto Da", value=f"{adder.mention} (`{adder.id}`)", inline=False)
+                embed.add_field(name="⚡ Azione Correttiva", value=f"`{action_desc}`", inline=False)
+                await send_typed_log(guild, "security", embed)
+                return
+
+    embed = discord.Embed(
+        title="📥 Registro Membri — Nuovo Ingresso", 
+        color=discord.Color.from_rgb(46, 204, 113), 
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.add_field(name="👤 Utente", value=f"{member.mention}\n`{member}`", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{member.id}`", inline=True)
+    embed.add_field(name="📅 Account Creato il", value=f"<t:{int(member.created_at.timestamp())}:D> (<t:{int(member.created_at.timestamp())}:R>)", inline=False)
+    
+    await send_typed_log(member.guild, "members", embed)
+
+
+@bot.event
+async def on_member_remove(member: discord.Member):
+    embed = discord.Embed(
+        title="📤 Registro Membri — Uscita / Kick", 
+        color=discord.Color.from_rgb(149, 165, 166), 
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.add_field(name="👤 Utente", value=f"{member.mention}\n`{member}`", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{member.id}`", inline=True)
+    
+    await send_typed_log(member.guild, "members", embed)
+
+
+@bot.event
+async def on_member_ban(guild: discord.Guild, user: discord.User):
+    embed = discord.Embed(
+        title="🔨 Registro Membri — Utente Bannato", 
+        color=discord.Color.from_rgb(192, 57, 43), 
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_thumbnail(url=user.display_avatar.url)
+    embed.add_field(name="👤 Utente", value=f"{user.mention}\n`{user}`", inline=True)
+    embed.add_field(name="🆔 ID", value=f"`{user.id}`", inline=True)
+    
+    await send_typed_log(guild, "members", embed)
+
+
+# 3. CANALI: CREAZIONE & ELIMINAZIONE
+@bot.event
+async def on_guild_channel_create(channel: discord.abc.GuildChannel):
+    embed = discord.Embed(
+        title="📁 Registro Canali — Creato", 
+        color=discord.Color.from_rgb(52, 152, 219), 
+        timestamp=discord.utils.utcnow()
+    )
+    embed.add_field(name="📌 Nome Canale", value=f"#{channel.name}" if isinstance(channel, discord.TextChannel) else f"🔊 {channel.name}", inline=True)
+    embed.add_field(name="📂 Categoria", value=channel.category.name if channel.category else "Nessuna", inline=True)
+    embed.add_field(name="🆔 ID Canale", value=f"`{channel.id}`", inline=True)
+    
+    await send_typed_log(channel.guild, "channels", embed)
+
+
+@bot.event
+async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
+    embed = discord.Embed(
+        title="❌ Registro Canali — Eliminato", 
+        color=discord.Color.from_rgb(231, 76, 60), 
+        timestamp=discord.utils.utcnow()
+    )
+    embed.add_field(name="📌 Nome Canale", value=f"#{channel.name}" if isinstance(channel, discord.TextChannel) else f"🔊 {channel.name}", inline=True)
+    embed.add_field(name="🆔 ID Canale", value=f"`{channel.id}`", inline=True)
+    
+    await send_typed_log(channel.guild, "channels", embed)
+
+
+# 4. RUOLI: CREAZIONE & ELIMINAZIONE
+@bot.event
+async def on_guild_role_create(role: discord.Role):
+    embed = discord.Embed(
+        title="🏷️ Registro Ruoli — Creato", 
+        color=discord.Color.from_rgb(155, 89, 182), 
+        timestamp=discord.utils.utcnow()
+    )
+    embed.add_field(name="📌 Nome Ruolo", value=role.mention, inline=True)
+    embed.add_field(name="🆔 ID Ruolo", value=f"`{role.id}`", inline=True)
+    embed.add_field(name="🎨 Colore", value=f"`{role.color}`", inline=True)
+    
+    await send_typed_log(role.guild, "roles", embed)
+
+
+@bot.event
+async def on_guild_role_delete(role: discord.Role):
+    embed = discord.Embed(
+        title="🗑️ Registro Ruoli — Eliminato", 
+        color=discord.Color.from_rgb(231, 76, 60), 
+        timestamp=discord.utils.utcnow()
+    )
+    embed.add_field(name="📌 Nome Ruolo", value=f"**{role.name}**", inline=True)
+    embed.add_field(name="🆔 ID Ruolo", value=f"`{role.id}`", inline=True)
+    
+    await send_typed_log(role.guild, "roles", embed)
+
+
+# 5. VOCALI: SPOSTAMENTI E CONNESSIONI
+@bot.event
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    if member.bot:
+        return
+        
+    guild = member.guild
+    if before.channel is None and after.channel is not None:
+        embed = discord.Embed(title="🔊 Attività Vocale — Entrato", color=discord.Color.from_rgb(52, 152, 219), timestamp=discord.utils.utcnow())
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="👤 Utente", value=f"{member.mention}", inline=True)
+        embed.add_field(name="🎙️ Canale Vocale", value=f"`{after.channel.name}`", inline=True)
+        await send_typed_log(guild, "voice", embed)
+        
+    elif before.channel is not None and after.channel is None:
+        embed = discord.Embed(title="🔇 Attività Vocale — Uscito", color=discord.Color.from_rgb(127, 140, 141), timestamp=discord.utils.utcnow())
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="👤 Utente", value=f"{member.mention}", inline=True)
+        embed.add_field(name="🎙️ Canale Precedente", value=f"`{before.channel.name}`", inline=True)
+        await send_typed_log(guild, "voice", embed)
+        
+    elif before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
+        embed = discord.Embed(title="🔀 Attività Vocale — Spostato", color=discord.Color.from_rgb(155, 89, 182), timestamp=discord.utils.utcnow())
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="👤 Utente", value=f"{member.mention}", inline=True)
+        embed.add_field(name="🎙️ Da", value=f"`{before.channel.name}`", inline=True)
+        embed.add_field(name="🎙️ A", value=f"`{after.channel.name}`", inline=True)
+        await send_typed_log(guild, "voice", embed)
+
+
+# ==========================================
+# 🎛️ PANNELLO DI SETTING INTERATTIVO (DB FIRST)
 # ==========================================
 
 class ModuleSelect(discord.ui.Select):
@@ -228,7 +413,8 @@ class ModuleSelect(discord.ui.Select):
         
         module_key = self.values[0]
         view = ModuleConfigView(module_key)
-        mod_info = config_data["security"][module_key]
+        security_config = get_db_security()
+        mod_info = security_config.get(module_key, {})
         
         status_str = "✅ Abilitato" if mod_info.get("enabled") else "❌ Disabilitato"
         desc = (
@@ -253,9 +439,10 @@ class ModuleConfigView(discord.ui.View):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
-        curr = config_data["security"][self.module_key].get("enabled", True)
-        config_data["security"][self.module_key]["enabled"] = not curr
-        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
+        sec = get_db_security()
+        curr = sec[self.module_key].get("enabled", True)
+        sec[self.module_key]["enabled"] = not curr
+        save_db_security(sec)
         
         await interaction.response.send_message(f"✅ Stato del modulo modificato a: **{'Abilitato' if not curr else 'Disabilitato'}**", ephemeral=True)
 
@@ -285,21 +472,12 @@ class ModuleSettingsModal(discord.ui.Modal, title="Modifica Parametri Modulo"):
         super().__init__()
         self.module_key = module_key
         
-        curr_action = config_data["security"][module_key].get("action", "delete")
-        curr_timeout = str(config_data["security"][module_key].get("timeout_minutes", 1))
+        sec = get_db_security()
+        curr_action = sec[module_key].get("action", "delete")
+        curr_timeout = str(sec[module_key].get("timeout_minutes", 1))
         
-        self.action_input = discord.ui.TextInput(
-            label="Azione (delete, timeout, kick, ban...)",
-            default=curr_action,
-            required=True,
-            max_length=20
-        )
-        self.timeout_input = discord.ui.TextInput(
-            label="Minuti di Timeout (se applicabile)",
-            default=curr_timeout,
-            required=False,
-            max_length=5
-        )
+        self.action_input = discord.ui.TextInput(label="Azione (delete, timeout, kick, ban...)", default=curr_action, required=True, max_length=20)
+        self.timeout_input = discord.ui.TextInput(label="Minuti di Timeout (se applicabile)", default=curr_timeout, required=False, max_length=5)
         self.add_item(self.action_input)
         self.add_item(self.timeout_input)
 
@@ -307,17 +485,18 @@ class ModuleSettingsModal(discord.ui.Modal, title="Modifica Parametri Modulo"):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
             
+        sec = get_db_security()
         new_action = self.action_input.value.strip().lower()
-        config_data["security"][self.module_key]["action"] = new_action
+        sec[self.module_key]["action"] = new_action
         
         if self.timeout_input.value and self.timeout_input.value.isdigit():
-            config_data["security"][self.module_key]["timeout_minutes"] = int(self.timeout_input.value.strip())
+            sec[self.module_key]["timeout_minutes"] = int(self.timeout_input.value.strip())
             
-        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
-        await interaction.response.send_message(f"✅ Parametri aggiornati con successo per `{self.module_key}`!", ephemeral=True)
+        save_db_security(sec)
+        await interaction.response.send_message(f"✅ Parametri aggiornati con successo per `{self.module_key}` nel DB!", ephemeral=True)
 
 
-# --- GESTIONE GLOBAL WHITELIST INTERATTIVA (RUOLI & UTENTI) ---
+# --- GESTIONE GLOBAL WHITELIST SU TABELLA DB ---
 
 class GlobalWhitelistView(discord.ui.View):
     def __init__(self):
@@ -329,7 +508,7 @@ class GlobalWhitelistView(discord.ui.View):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
         role = select.values[0]
-        view = WhitelistActionConfirmView(target_id=role.id, target_name=role.name, is_role=True)
+        view = WhitelistActionConfirmView(target_id=role.id, target_name=role.name, target_type="role")
         await interaction.response.edit_message(content=f"⚙️ Ruolo selezionato: **{role.name}**\nCosa desideri fare?", view=view, embed=None)
 
     @discord.ui.select(cls=discord.ui.UserSelect, placeholder="Seleziona un utente dalla lista...", min_values=1, max_values=1, row=1)
@@ -338,63 +517,49 @@ class GlobalWhitelistView(discord.ui.View):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
         user = select.values[0]
-        view = WhitelistActionConfirmView(target_id=user.id, target_name=str(user), is_role=False)
+        view = WhitelistActionConfirmView(target_id=user.id, target_name=str(user), target_type="user")
         await interaction.response.edit_message(content=f"⚙️ Utente selezionato: **{user}**\nCosa desideri fare?", view=view, embed=None)
 
 
 class WhitelistActionConfirmView(discord.ui.View):
-    def __init__(self, target_id: int, target_name: str, is_role: bool):
+    def __init__(self, target_id: int, target_name: str, target_type: str):
         super().__init__(timeout=180)
         self.target_id = target_id
         self.target_name = target_name
-        self.is_role = is_role
+        self.target_type = target_type
 
     @discord.ui.button(label="Aggiungi alla Whitelist", style=discord.ButtonStyle.success, emoji="✅")
     async def add_wh(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
-        updated_count = 0
-        for module_name, module_config in config_data["security"].items():
-            if self.is_role:
-                lst = module_config.setdefault("whitelist_roles", [])
-                if self.target_id not in lst:
-                    lst.append(self.target_id)
-                    updated_count += 1
-            else:
-                lst = module_config.setdefault("whitelist_users", [])
-                if self.target_id not in lst:
-                    lst.append(self.target_id)
-                    updated_count += 1
-
-        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
-        tipo = "Ruolo" if self.is_role else "Utente"
-        await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) aggiunto con successo a **{updated_count}** moduli di sicurezza!", view=None)
+        try:
+            supabase.table("bot_whitelist").upsert({
+                "id": self.target_id,
+                "target_type": self.target_type,
+                "target_name": self.target_name
+            }, on_conflict="id").execute()
+            
+            tipo = "Ruolo" if self.target_type == "role" else "Utente"
+            await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) aggiunto con successo alla tabella Whitelist del DB!", view=None)
+        except Exception as e:
+            await interaction.response.edit_message(content=f"❌ Errore durante il salvataggio su Supabase: `{e}`", view=None)
 
     @discord.ui.button(label="Rimuovi dalla Whitelist", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def remove_wh(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
-        updated_count = 0
-        for module_name, module_config in config_data["security"].items():
-            if self.is_role:
-                lst = module_config.setdefault("whitelist_roles", [])
-                if self.target_id in lst:
-                    lst.remove(self.target_id)
-                    updated_count += 1
-            else:
-                lst = module_config.setdefault("whitelist_users", [])
-                if self.target_id in lst:
-                    lst.remove(self.target_id)
-                    updated_count += 1
-
-        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
-        tipo = "Ruolo" if self.is_role else "Utente"
-        await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) rimosso con successo da **{updated_count}** moduli.", view=None)
+        try:
+            supabase.table("bot_whitelist").delete().eq("id", self.target_id).execute()
+            
+            tipo = "Ruolo" if self.target_type == "role" else "Utente"
+            await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) rimosso con successo dalla tabella Whitelist del DB!", view=None)
+        except Exception as e:
+            await interaction.response.edit_message(content=f"❌ Errore durante la rimozione su Supabase: `{e}`", view=None)
 
 
-# --- CONFIGURAZIONE CANALI LOG CON SELETTORI INTERATTIVI ---
+# --- CONFIGURAZIONE CANALI LOG SU DB ---
 
 class LogChannelSelect(discord.ui.Select):
     def __init__(self, guild: discord.Guild):
@@ -447,12 +612,11 @@ class ChannelPickerSelect(discord.ui.Select):
             
         ch_id = int(self.values[0])
         
-        if "log_channels" not in config_data:
-            config_data["log_channels"] = {}
-        config_data["log_channels"][self.log_type] = ch_id
+        logs = get_db_log_channels()
+        logs[self.log_type] = ch_id
+        save_db_log_channels(logs)
         
-        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
-        await interaction.response.edit_message(content=f"✅ Canale log per `{self.log_type}` impostato con successo su <#{ch_id}>!", embed=None, view=None)
+        await interaction.response.edit_message(content=f"✅ Canale log per `{self.log_type}` impostato con successo su <#{ch_id}> nel DB!", embed=None, view=None)
 
 
 class ChannelPickerView(discord.ui.View):
@@ -467,8 +631,6 @@ class LogChannelSelectView(discord.ui.View):
         self.add_item(LogChannelSelect(guild))
 
 
-# --- VISTA PRINCIPALE DEL PANNELLO ---
-
 class SettingsMainView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
         super().__init__(timeout=180)
@@ -482,8 +644,8 @@ class SettingsMainView(discord.ui.View):
         
         view = GlobalWhitelistView()
         embed = discord.Embed(
-            title="🌐 Gestione Global Whitelist",
-            description="Usa i menu a tendina sottostanti per selezionare direttamente un **ruolo** o un **utente** da aggiungere o rimuovere dai controlli di sicurezza.",
+            title="🌐 Gestione Global Whitelist (Database)",
+            description="Seleziona un ruolo o un utente dai menu sottostanti per gestirlo direttamente sul database Supabase.",
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
@@ -502,8 +664,6 @@ class SettingsMainView(discord.ui.View):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
-# --- COMANDO SLASH PRINCIPALE ---
-
 @bot.tree.command(name="setting", description="Apre il pannello di controllo completo e interattivo di Madison State")
 async def setting_command(interaction: discord.Interaction):
     if not await is_owner_or_guild_owner(interaction):
@@ -517,21 +677,10 @@ async def setting_command(interaction: discord.Interaction):
     view = SettingsMainView(interaction.guild)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-# ==========================================
-# 🛡️ FUNZIONI DI UTILITÀ PER LA SICUREZZA
-# ==========================================
 
-def is_whitelisted(member: discord.Member, rule_config: dict):
-    if not member:
-        return False
-    if member.guild_permissions.administrator:
-        return True
-    if member.id in rule_config.get("whitelist_users", []):
-        return True
-    for role in member.roles:
-        if role.id in rule_config.get("whitelist_roles", []):
-            return True
-    return False
+# ==========================================
+# 🛡️ CONTROLLI DI SICUREZZA IN TEMPO REALE
+# ==========================================
 
 async def apply_generic_action(guild: discord.Guild, member: discord.Member, action: str, reason: str):
     if not member or member.guild_permissions.administrator:
@@ -548,10 +697,6 @@ async def apply_generic_action(guild: discord.Guild, member: discord.Member, act
     return "Nessuna azione eseguita"
 
 
-# ==========================================
-# 🔍 FILTRI DI SICUREZZA IN TEMPO REALE
-# ==========================================
-
 @bot.event
 async def on_message(message: discord.Message):
     if message.author.bot or not message.guild:
@@ -560,11 +705,11 @@ async def on_message(message: discord.Message):
 
     member = message.author
     content_lower = message.content.lower()
-    sec = config_data.get("security", {})
+    sec = get_db_security()
 
     # 1. Anti-Invite
     if sec.get("anti_invite", {}).get("enabled") and ("discord.gg/" in content_lower or "discord.com/invite/" in content_lower):
-        if not is_whitelisted(member, sec["anti_invite"]):
+        if not is_whitelisted_db(member):
             action = sec["anti_invite"].get("action", "delete")
             minutes = sec["anti_invite"].get("timeout_minutes", 1)
             try:
@@ -591,7 +736,7 @@ async def on_message(message: discord.Message):
     # 2. Anti-Link
     if sec.get("anti_link", {}).get("enabled") and ("http://" in content_lower or "https://" in content_lower):
         if "discord.gg" not in content_lower and "youtube.com" not in content_lower:
-            if not is_whitelisted(member, sec["anti_link"]):
+            if not is_whitelisted_db(member):
                 action = sec["anti_link"].get("action", "delete")
                 minutes = sec["anti_link"].get("timeout_minutes", 1)
                 try:
@@ -617,7 +762,7 @@ async def on_message(message: discord.Message):
 
     # 3. Anti-Spam
     if sec.get("anti_spam", {}).get("enabled"):
-        if not is_whitelisted(member, sec["anti_spam"]):
+        if not is_whitelisted_db(member):
             user_id = member.id
             now = time.time()
             spam_tracker[user_id] = [t for t in spam_tracker[user_id] if now - t < 4]
@@ -649,308 +794,6 @@ async def on_message(message: discord.Message):
     await bot.process_commands(message)
 
 
-# ==========================================
-# 🤖 ANTI-BOT ADD
-# ==========================================
-@bot.event
-async def on_member_join(member: discord.Member):
-    if member.bot:
-        sec = config_data.get("security", {}).get("anti_bot_add", {})
-        if sec.get("enabled"):
-            guild = member.guild
-            adder = None
-            try:
-                async for entry in guild.audit_logs(limit=3, action=discord.AuditLogAction.bot_add):
-                    if entry.target.id == member.id:
-                        adder = entry.user
-                        break
-            except:
-                pass
-
-            if adder and not (adder.guild_permissions.administrator or adder.id in sec.get("whitelist_users", [])):
-                action = sec.get("action", "kick")
-                action_desc = await apply_generic_action(guild, adder, action, "Aggiunta bot non autorizzata")
-                try:
-                    await member.kick(reason="Bot aggiunto senza autorizzazione")
-                except:
-                    pass
-
-                embed = discord.Embed(title="🚨 Madison Security — Bot Non Autorizzato", color=discord.Color.from_rgb(204, 41, 41), timestamp=discord.utils.utcnow())
-                embed.set_thumbnail(url=member.display_avatar.url)
-                embed.add_field(name="🤖 Bot Rilevato", value=f"{member} (`{member.id}`)", inline=False)
-                embed.add_field(name="👤 Aggiunto Da", value=f"{adder.mention} (`{adder.id}`)", inline=False)
-                embed.add_field(name="⚡ Azione Correttiva", value=f"`{action_desc}`", inline=False)
-                await send_typed_log(guild, "security", embed)
-                return
-            else:
-                return
-
-    embed = discord.Embed(title="📥 Madison State — Nuovo Ingresso", color=discord.Color.from_rgb(46, 204, 113), timestamp=discord.utils.utcnow())
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="👤 Utente", value=f"{member.mention}\n`ID: {member.id}`", inline=True)
-    embed.add_field(name="📅 Account Creato", value=f"<t:{int(member.created_at.timestamp())}:R>", inline=True)
-    await send_typed_log(member.guild, "members", embed)
-
-
-# ==========================================
-# 🏷️ ANTI-ROLE CREATE & DANGEROUS ROLE
-# ==========================================
-@bot.event
-async def on_guild_role_create(role: discord.Role):
-    guild = role.guild
-    sec_create = config_data.get("security", {}).get("anti_role_create", {})
-    sec_danger = config_data.get("security", {}).get("anti_dangerous_role", {})
-
-    creator = None
-    try:
-        async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.role_create):
-            if entry.target.id == role.id:
-                creator = entry.user
-                break
-    except:
-        pass
-
-    if sec_create.get("enabled") and creator:
-        if not is_whitelisted(creator, sec_create):
-            action = sec_create.get("action", "delete")
-            action_desc = "Ruolo eliminato"
-            try:
-                if action == "delete":
-                    await role.delete(reason="Anti-Role Create attivo")
-                else:
-                    action_desc = await apply_generic_action(guild, creator, action, "Creazione ruolo non autorizzata")
-                    await role.delete(reason="Creazione non autorizzata")
-            except Exception as e:
-                action_desc += f" (Errore: {e})"
-
-            embed = discord.Embed(title="🚨 Madison Security — Ruolo Bloccato", color=discord.Color.from_rgb(217, 130, 43), timestamp=discord.utils.utcnow())
-            embed.add_field(name="👤 Autore", value=f"{creator.mention} (`{creator.id}`)", inline=True)
-            embed.add_field(name="🏷️ Ruolo Coinvolto", value=f"`{role.name}`", inline=True)
-            embed.add_field(name="⚡ Azione Correttiva", value=f"`{action_desc}`", inline=False)
-            await send_typed_log(guild, "security", embed)
-            return
-
-    if sec_danger.get("enabled") and creator:
-        if role.permissions.administrator or role.permissions.ban_members or role.permissions.kick_members:
-            if not is_whitelisted(creator, sec_danger):
-                action = sec_danger.get("action", "remove_perms")
-                action_desc = "Permessi pericolosi rimossi"
-                try:
-                    if action == "remove_perms":
-                        await role.edit(permissions=discord.Permissions.none(), reason="Anti-Dangerous Role attivo")
-                    elif action in ["kick", "ban"]:
-                        action_desc = await apply_generic_action(guild, creator, action, "Ruolo con permessi critici")
-                        await role.delete(reason="Eliminato ruolo pericoloso")
-                except Exception as e:
-                    action_desc += f" (Errore: {e})"
-
-                embed = discord.Embed(title="🚨 Madison Security — Ruolo Pericoloso", color=discord.Color.from_rgb(204, 41, 41), timestamp=discord.utils.utcnow())
-                embed.add_field(name="👤 Autore", value=f"{creator.mention} (`{creator.id}`)", inline=True)
-                embed.add_field(name="⚠️ Ruolo Pericoloso", value=f"`{role.name}`", inline=True)
-                embed.add_field(name="⚡ Azione Correttiva", value=f"`{action_desc}`", inline=False)
-                await send_typed_log(guild, "security", embed)
-                return
-
-    embed = discord.Embed(title="🏷️ Madison State — Ruolo Creato", color=discord.Color.from_rgb(52, 152, 219), timestamp=discord.utils.utcnow())
-    embed.add_field(name="Nome Ruolo", value=f"`{role.name}`", inline=True)
-    embed.add_field(name="ID Ruolo", value=f"`{role.id}`", inline=True)
-    await send_typed_log(guild, "roles", embed)
-
-
-# ==========================================
-# 🗑️ ANTI-ROLE DELETE
-# ==========================================
-@bot.event
-async def on_guild_role_delete(role: discord.Role):
-    guild = role.guild
-    sec = config_data.get("security", {}).get("anti_role_delete", {})
-    
-    deleter = None
-    try:
-        async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.role_delete):
-            if entry.target.id == role.id:
-                deleter = entry.user
-                break
-    except:
-        pass
-
-    if sec.get("enabled") and deleter and not is_whitelisted(deleter, sec):
-        action = sec.get("action", "kick")
-        action_desc = await apply_generic_action(guild, deleter, action, "Eliminazione ruolo non autorizzata")
-
-        embed = discord.Embed(title="🚨 Madison Security — Eliminazione Ruolo", color=discord.Color.from_rgb(204, 41, 41), timestamp=discord.utils.utcnow())
-        embed.add_field(name="👤 Autore", value=f"{deleter.mention} (`{deleter.id}`)", inline=True)
-        embed.add_field(name="🏷️ Ruolo Eliminato", value=f"`{role.name}`", inline=True)
-        embed.add_field(name="⚡ Azione Correttiva", value=f"`{action_desc}`", inline=False)
-        await send_typed_log(guild, "security", embed)
-        return
-
-    embed = discord.Embed(title="🗑️ Madison State — Ruolo Eliminato", color=discord.Color.from_rgb(231, 76, 60), timestamp=discord.utils.utcnow())
-    embed.add_field(name="Nome Ruolo", value=f"`{role.name}`", inline=True)
-    await send_typed_log(guild, "roles", embed)
-
-
-# ==========================================
-# 📁 ANTI-CHANNEL CREATE
-# ==========================================
-@bot.event
-async def on_guild_channel_create(channel: discord.abc.GuildChannel):
-    guild = channel.guild
-    sec = config_data.get("security", {}).get("anti_channel_create", {})
-    
-    creator = None
-    try:
-        async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.channel_create):
-            if entry.target.id == channel.id:
-                creator = entry.user
-                break
-    except:
-        pass
-
-    if sec.get("enabled") and creator and not is_whitelisted(creator, sec):
-        action = sec.get("action", "delete")
-        action_desc = "Canale eliminato"
-        try:
-            if action == "delete":
-                await channel.delete(reason="Anti-Channel Create attivo")
-            else:
-                action_desc = await apply_generic_action(guild, creator, action, "Creazione canale non autorizzata")
-                await channel.delete(reason="Eliminato canale non autorizzato")
-        except Exception as e:
-            action_desc += f" (Errore: {e})"
-
-        embed = discord.Embed(title="🚨 Madison Security — Canale Bloccato", color=discord.Color.from_rgb(217, 130, 43), timestamp=discord.utils.utcnow())
-        embed.add_field(name="👤 Autore", value=f"{creator.mention} (`{creator.id}`)", inline=True)
-        embed.add_field(name="📁 Canale", value=f"`{channel.name}`", inline=True)
-        embed.add_field(name="⚡ Azione Correttiva", value=f"`{action_desc}`", inline=False)
-        await send_typed_log(guild, "security", embed)
-        return
-
-    embed = discord.Embed(title="📁 Madison State — Canale Creato", color=discord.Color.from_rgb(52, 152, 219), timestamp=discord.utils.utcnow())
-    embed.add_field(name="Nome Canale", value=f"{channel.mention} (`{channel.name}`)", inline=True)
-    await send_typed_log(guild, "channels", embed)
-
-
-# ==========================================
-# ❌ ANTI-CHANNEL DELETE
-# ==========================================
-@bot.event
-async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
-    guild = channel.guild
-    sec = config_data.get("security", {}).get("anti_channel_delete", {})
-    
-    deleter = None
-    try:
-        async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.channel_delete):
-            if entry.target.id == channel.id:
-                deleter = entry.user
-                break
-    except:
-        pass
-
-    if sec.get("enabled") and deleter and not is_whitelisted(deleter, sec):
-        action = sec.get("action", "kick")
-        action_desc = await apply_generic_action(guild, deleter, action, "Eliminazione canale non autorizzata")
-
-        embed = discord.Embed(title="🚨 Madison Security — Eliminazione Canale", color=discord.Color.from_rgb(204, 41, 41), timestamp=discord.utils.utcnow())
-        embed.add_field(name="👤 Autore", value=f"{deleter.mention} (`{deleter.id}`)", inline=True)
-        embed.add_field(name="📁 Canale Eliminato", value=f"`{channel.name}`", inline=True)
-        embed.add_field(name="⚡ Azione Correttiva", value=f"`{action_desc}`", inline=False)
-        await send_typed_log(guild, "security", embed)
-        return
-
-    embed = discord.Embed(title="❌ Madison State — Canale Eliminato", color=discord.Color.from_rgb(231, 76, 60), timestamp=discord.utils.utcnow())
-    embed.add_field(name="Nome Canale", value=f"`{channel.name}`", inline=True)
-    await send_typed_log(guild, "channels", embed)
-
-
-# ==========================================
-# 📊 ALTRI EVENTI LOG (STILE ELEGANTE)
-# ==========================================
-
-@bot.event
-async def on_message_delete(message: discord.Message):
-    if not message.guild or message.author.bot:
-        return
-    embed = discord.Embed(title="🗑️ Madison State — Messaggio Eliminato", color=discord.Color.from_rgb(231, 76, 60), timestamp=discord.utils.utcnow())
-    embed.set_thumbnail(url=message.author.display_avatar.url)
-    embed.add_field(name="👤 Autore", value=f"{message.author.mention}\n`ID: {message.author.id}`", inline=True)
-    embed.add_field(name="📍 Canale", value=message.channel.mention, inline=True)
-    content = message.content or "*[Nessun testo / Solo allegati]*"
-    if len(content) > 1024:
-        content = content[:1021] + "..."
-    embed.add_field(name="💬 Contenuto", value=content, inline=False)
-    await send_typed_log(message.guild, "messages", embed)
-
-@bot.event
-async def on_message_edit(before: discord.Message, after: discord.Message):
-    if not before.guild or before.author.bot or before.content == after.content:
-        return
-    embed = discord.Embed(title="✏️ Madison State — Messaggio Modificato", color=discord.Color.from_rgb(241, 196, 15), timestamp=discord.utils.utcnow())
-    embed.set_thumbnail(url=before.author.display_avatar.url)
-    embed.add_field(name="👤 Autore", value=f"{before.author.mention}\n`ID: {before.author.id}`", inline=True)
-    embed.add_field(name="📍 Canale", value=before.channel.mention, inline=True)
-    
-    old_c = before.content or "*[Vuoto]*"
-    new_c = after.content or "*[Vuoto]*"
-    if len(old_c) > 1024: old_c = old_c[:1021] + "..."
-    if len(new_c) > 1024: new_c = new_c[:1021] + "..."
-    
-    embed.add_field(name="📄 Prima della modifica", value=old_c, inline=False)
-    embed.add_field(name="📄 Dopo la modifica", value=new_c, inline=False)
-    await send_typed_log(before.guild, "messages", embed)
-
-@bot.event
-async def on_member_remove(member: discord.Member):
-    embed = discord.Embed(title="📤 Madison State — Uscita Utente", color=discord.Color.from_rgb(149, 165, 166), timestamp=discord.utils.utcnow())
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="👤 Utente", value=f"{member.mention}\n`ID: {member.id}`", inline=True)
-    await send_typed_log(member.guild, "members", embed)
-
-@bot.event
-async def on_member_ban(guild: discord.Guild, user: discord.User):
-    embed = discord.Embed(title="🔨 Madison State — Utente Bannato", color=discord.Color.from_rgb(192, 57, 43), timestamp=discord.utils.utcnow())
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="👤 Utente", value=f"{user.mention}\n`ID: {user.id}`", inline=True)
-    await send_typed_log(guild, "members", embed)
-
-@bot.event
-async def on_member_unban(guild: discord.Guild, user: discord.User):
-    embed = discord.Embed(title="🔓 Madison State — Utente Sbobannato", color=discord.Color.from_rgb(41, 128, 185), timestamp=discord.utils.utcnow())
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="👤 Utente", value=f"{user.mention}\n`ID: {user.id}`", inline=True)
-    await send_typed_log(guild, "members", embed)
-
-@bot.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    if before.timed_out_until != after.timed_out_until:
-        embed = discord.Embed(title="⏳ Madison State — Timeout Modificato", color=discord.Color.from_rgb(230, 126, 34), timestamp=discord.utils.utcnow())
-        embed.set_thumbnail(url=after.display_avatar.url)
-        embed.add_field(name="👤 Utente", value=f"{after.mention}\n`ID: {after.id}`", inline=True)
-        if after.timed_out_until:
-            embed.add_field(name="⏱️ Scadenza Timeout", value=f"<t:{int(after.timed_out_until.timestamp())}:F>", inline=False)
-        else:
-            embed.add_field(name="⚡ Stato", value="`Timeout rimosso con successo`", inline=False)
-        await send_typed_log(after.guild, "members", embed)
-
-@bot.event
-async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-    if before.channel == after.channel:
-        return
-    embed = discord.Embed(title="🔊 Madison State — Attività Vocale", color=discord.Color.from_rgb(155, 89, 182), timestamp=discord.utils.utcnow())
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="👤 Utente", value=f"{member.mention}\n`ID: {member.id}`", inline=True)
-    
-    if before.channel is None and after.channel is not None:
-        embed.add_field(name="🎧 Movimento", value=f"Entrato nel canale {after.channel.mention}", inline=False)
-    elif before.channel is not None and after.channel is None:
-        embed.add_field(name="🎧 Movimento", value=f"Uscito dal canale {before.channel.mention}", inline=False)
-    elif before.channel is not None and after.channel is not None:
-        embed.add_field(name="🎧 Movimento", value=f"Spostato da {before.channel.mention} a {after.channel.mention}", inline=False)
-        
-    await send_typed_log(member.guild, "voice", embed)
-
-
 if __name__ == "__main__":
-    keep_alive()  # Avvia Flask in un thread separato
+    keep_alive()
     bot.run(TOKEN)
