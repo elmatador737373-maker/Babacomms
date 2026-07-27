@@ -350,31 +350,131 @@ async def on_member_join(member: discord.Member):
 
 @bot.event
 async def on_member_remove(member: discord.Member):
-    embed = discord.Embed(
-        title="📤 Registro Membri — Uscita / Kick", 
-        color=discord.Color.from_rgb(149, 165, 166), 
-        timestamp=discord.utils.utcnow()
-    )
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="👤 Utente", value=f"{member.mention}\n`{member}`", inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{member.id}`", inline=True)
-    
-    await send_typed_log(member.guild, "members", embed)
+  guild = member.guild
+  moderator = None
+  kick_reason = 'Nessun motivo specificato'
+  is_kick = False
 
+  # Controlliamo nell'audit log se si tratta di un kick recente
+  try:
+    async for entry in guild.audit_logs(
+        limit=5, action=discord.AuditLogAction.kick
+    ):
+      if entry.target and entry.target.id == member.id:
+        # Verifichiamo che l'azione sia avvenuta negli ultimi secondi per evitare falsi positivi storici
+        if (
+            discord.utils.utcnow() - entry.created_at
+        ).total_seconds() < 10:
+          is_kick = True
+          moderator = entry.user
+          if entry.reason:
+            kick_reason = entry.reason
+          break
+  except Exception:
+    pass
+
+  if is_kick:
+    # --- LOG KICK (Espulsione) ---
+    embed = discord.Embed(
+        title='👢 Registro Membri — Utente Espulso (Kick)',
+        color=discord.Color.from_rgb(230, 126, 34),
+        timestamp=discord.utils.utcnow(),
+    )
+    if member.avatar:
+      embed.set_thumbnail(url=member.display_avatar.url)
+
+    embed.add_field(
+        name='👤 Utente', value=f'{member.mention}\n`{member}`', inline=True
+    )
+    embed.add_field(name='🆔 ID', value=f'`{member.id}`', inline=True)
+
+    if moderator:
+      embed.add_field(
+          name='👮 Moderatore Responsabile',
+          value=f'{moderator.mention}\n`ID: {moderator.id}`',
+          inline=False,
+      )
+
+    embed.add_field(
+        name='📝 Motivo dell\'Espulsione',
+        value=f'```{kick_reason}```',
+        inline=False,
+    )
+
+    await send_typed_log(guild, 'members', embed)
+
+  else:
+    # --- LOG USCITA STANDARD (Abbandono volontario) ---
+    embed = discord.Embed(
+        title='📤 Registro Membri — Uscita dal Server',
+        color=discord.Color.from_rgb(149, 165, 166),
+        timestamp=discord.utils.utcnow(),
+    )
+    if member.avatar:
+      embed.set_thumbnail(url=member.display_avatar.url)
+
+    embed.add_field(
+        name='👤 Utente', value=f'{member.mention}\n`{member}`', inline=True
+    )
+    embed.add_field(name='🆔 ID', value=f'`{member.id}`', inline=True)
+
+    roles = [r.mention for r in member.roles if r != guild.default_role]
+    if roles:
+      roles_str = ', '.join(roles[:10])
+      if len(roles) > 10:
+        roles_str += f' e altri {len(roles) - 10} ruoli'
+      embed.add_field(
+          name=f'🏷️ Ruoli Posseduti ({len(roles)})',
+          value=roles_str,
+          inline=False,
+      )
+
+    await send_typed_log(guild, 'members', embed)
 
 @bot.event
 async def on_member_ban(guild: discord.Guild, user: discord.User):
-    embed = discord.Embed(
-        title="🔨 Registro Membri — Utente Bannato", 
-        color=discord.Color.from_rgb(192, 57, 43), 
-        timestamp=discord.utils.utcnow()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="👤 Utente", value=f"{user.mention}\n`{user}`", inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{user.id}`", inline=True)
-    
-    await send_typed_log(guild, "members", embed)
+  moderator = None
+  ban_reason = 'Nessun motivo specificato'
 
+  try:
+    async for entry in guild.audit_logs(
+        limit=5, action=discord.AuditLogAction.ban
+    ):
+      if entry.target and entry.target.id == user.id:
+        moderator = entry.user
+        if entry.reason:
+          ban_reason = entry.reason
+        break
+  except Exception:
+    pass
+
+  embed = discord.Embed(
+      title='🔨 Registro Membri — Utente Bannato',
+      color=discord.Color.from_rgb(192, 57, 43),
+      timestamp=discord.utils.utcnow(),
+  )
+  if user.avatar:
+    embed.set_thumbnail(url=user.display_avatar.url)
+
+  embed.add_field(
+      name='👤 Utente', value=f'{user.mention}\n`{user}`', inline=True
+  )
+  embed.add_field(name='🆔 ID', value=f'`{user.id}`', inline=True)
+
+  if moderator:
+    embed.add_field(
+        name='👮 Moderatore Responsabile',
+        value=f'{moderator.mention}\n`ID: {moderator.id}`',
+        inline=False,
+    )
+
+  embed.add_field(
+      name='📝 Motivo del Ban',
+      value=f'```{ban_reason}```',
+      inline=False,
+  )
+
+  await send_typed_log(guild, 'members', embed)
 
 # 3. CANALI: CREAZIONE & ELIMINAZIONE
 @bot.event
@@ -453,14 +553,44 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
         embed.add_field(name="🎙️ Canale Precedente", value=f"`{before.channel.name}`", inline=True)
         await send_typed_log(guild, "voice", embed)
         
-    elif before.channel is not None and after.channel is not None and before.channel.id != after.channel.id:
-        embed = discord.Embed(title="🔀 Attività Vocale — Spostato", color=discord.Color.from_rgb(155, 89, 182), timestamp=discord.utils.utcnow())
-        embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="👤 Utente", value=f"{member.mention}", inline=True)
-        embed.add_field(name="🎙️ Da", value=f"`{before.channel.name}`", inline=True)
-        embed.add_field(name="🎙️ A", value=f"`{after.channel.name}`", inline=True)
-        await send_typed_log(guild, "voice", embed)
+  # Spostamento da un canale vocale all'altro
+  elif (
+      before.channel is not None
+      and after.channel is not None
+      and before.channel.id != after.channel.id
+  ):
+    moderator = None
+    try:
+      async for entry in guild.audit_logs(
+          limit=5, action=discord.AuditLogAction.member_move
+      ):
+        if entry.target and entry.target.id == member.id:
+          if (
+              discord.utils.utcnow() - entry.created_at
+          ).total_seconds() < 10:
+            moderator = entry.user
+            break
+    except Exception:
+      pass
 
+    embed = discord.Embed(
+        title='🔀 Attività Vocale — Spostato',
+        color=discord.Color.from_rgb(155, 89, 182),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.add_field(name='👤 Utente', value=f'{member.mention}', inline=True)
+    embed.add_field(name='🎙️ Da', value=f'`{before.channel.name}`', inline=True)
+    embed.add_field(name='🎙️ A', value=f'`{after.channel.name}`', inline=True)
+
+    if moderator:
+      embed.add_field(
+          name='👮 Moderatore Responsabile',
+          value=f'{moderator.mention}\n`ID: {moderator.id}`',
+          inline=False,
+      )
+
+    await send_typed_log(guild, 'voice', embed)
 
 # ==========================================
 # 🎛️ PANNELLO DI SETTING INTERATTIVO (DB FIRST)
