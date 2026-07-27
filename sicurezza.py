@@ -666,7 +666,7 @@ class LogChannelSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
-            return await interaction.2.response.send_message("❌ Non hai i permessi.", ephemeral=True) if hasattr(interaction, 'response') else await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         log_type = self.values[0]
         view = ChannelPickerView(log_type, self.guild, page=0)
         embed = discord.Embed(
@@ -675,7 +675,6 @@ class LogChannelSelect(discord.ui.Select):
             color=discord.Color.blurple()
         )
         await interaction.response.edit_message(embed=embed, view=view)
-
 
 class ChannelPickerSelect(discord.ui.Select):
     def __init__(self, log_type: str, guild: discord.Guild, page: int = 0):
