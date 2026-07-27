@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Il bot di Backup Cloud con Password da ENV è online!"
+    return "Il bot di Backup Cloud Totale è online!"
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
@@ -20,18 +20,16 @@ def run_flask():
 # --- Configurazione Discord Bot ---
 intents = discord.Intents.all()
 
-# --- ID DEI SERVER E DEI CANALI (INSERISCI I TUOI ID REALI) ---
+# --- ID DEI SERVER E DEI CANALI ---
 SOURCE_SERVER_ID = 1446478097494048783        # ID del server PRINCIPALE da cui fare il backup
 BACKUP_SERVER_ID = 1531305565496672266        # ID del server SECONDARIO (di sicurezza/destinazione)
 CLOUD_JSON_CHANNEL_ID = 1531308877943935178   # ID del canale privato nel server di backup dove salvare il JSON Cloud
 
 # --- I 2 UTENTI AMMINISTRATORI SEPARATI ---
-ADMIN_1_ID = 1487792322392363008  # Inserisci qui l'ID del primo amministratore
-ADMIN_2_ID = 1191824316376043580  # Inserisci qui l'ID del secondo amministratore
+ADMIN_1_ID = 1487792322392363008  # ID del primo amministratore
+ADMIN_2_ID = 1191824316376043580  # ID del secondo amministratore
 
 # --- PASSWORD SEGRETA LETTA DA VARIABILE D'AMBIENTE (ENV) ---
-# Su Render o nel tuo sistema, imposta la variabile d'ambiente BACKUP_PASSWORD.
-# Se non viene trovata, userà "LaTuaPasswordSegreta123" come fallback di sicurezza.
 BACKUP_PASSWORD = os.getenv("BACKUP_PASSWORD")
 
 
@@ -122,8 +120,8 @@ class PasswordModal(discord.ui.Modal, title="Verifica di Sicurezza - Password"):
         self.bot = bot
 
     async def on_submit(self, interaction: discord.Interaction):
-        if self.password_input.value != BACKUP_PASSWORD:
-            await interaction.response.send_message("❌ **Password Errata!** Operazione interrotta.", ephemeral=True)
+        if not BACKUP_PASSWORD or self.password_input.value != BACKUP_PASSWORD:
+            await interaction.response.send_message("❌ **Password Errata o non configurata nelle ENV!** Operazione interrotta.", ephemeral=True)
             return
 
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -247,9 +245,9 @@ async def manualbackup(interaction: discord.Interaction):
         await interaction.response.send_message("❌ **Errore:** Questo comando può essere eseguito solo nel server sorgente.", ephemeral=True)
         return
 
-    await interaction.response.send_message("⏳ **Scansione totale e illimitata dello storico in corso...**", ephemeral=True)
-    guild = interaction.guild
+    await interaction.response.defer(thinking=True, ephemeral=True)
     
+    guild = interaction.guild
     data = await load_backup_data(bot)
 
     for role in guild.roles:
@@ -326,7 +324,7 @@ async def securepanel(interaction: discord.Interaction):
             f"Pannello di controllo ufficiale (Server ID: `{SOURCE_SERVER_ID}`).\n\n"
             "• **Backup Illimitato:** `/manualbackup` scarica TUTTO lo storico passato senza limiti.\n"
             "• **Tempo Reale:** Ogni modifica viene registrata all'istante.\n"
-            "• **Ripristino Sicuro:** Richiede l'inserimento della password tramite variabile d'ambiente.\n\n"
+            "• **Ripristino Sicuro:** Richiede la password configurata tramite variabile d'ambiente (`BACKUP_PASSWORD`).\n\n"
             "🔐 *Riservato esclusivamente ai 2 admin.*"
         ),
         color=discord.Color.dark_red()
@@ -404,5 +402,5 @@ if __name__ == "__main__":
     t = threading.Thread(target=run_flask)
     t.start()
     
-    TOKEN = os.getenv("DISCORD_TOKEN") or "IL_TUO_TOKEN_BOT"
+    TOKEN = os.getenv("DISCORD_TOKEN")
     bot.run(TOKEN)
