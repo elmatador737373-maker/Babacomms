@@ -76,7 +76,7 @@ class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
         channel_name = f"unban-{interaction.user.name}"
         ticket_channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
 
-        # Messaggio di benvenuto senza il tag extra
+        # Messaggio di benvenuto nel ticket
         embed = discord.Embed(
             title="🔓 Richiesta di Unban - Madison",
             description=(
@@ -155,6 +155,9 @@ async def panel(ctx):
         ),
         color=discord.Color.from_rgb(43, 45, 49)
     )
+    
+    # Aggiunge l'immagine tramite link Imgur al pannello
+    embed.set_image(url="IL_TUO_LINK_IMGUR")
     
     view = UnbanDropView()
     await ctx.send(embed=embed, view=view)
