@@ -24,6 +24,7 @@ intents = discord.Intents.all()
 SOURCE_SERVER_ID = 1446478097494048783        # ID del server PRINCIPALE da cui fare il backup
 BACKUP_SERVER_ID = 1531305565496672266        # ID del server SECONDARIO (di sicurezza/destinazione)
 CLOUD_JSON_CHANNEL_ID = 1531308877943935178   # ID del canale privato nel server di backup dove salvare il JSON Cloud
+LOG_CHANNEL_ID = 1531352502132277378          # 🔔 ID del canale nel server secondario dove inviare i log in tempo reale (NON ephemeral)
 
 # --- I 2 UTENTI AMMINISTRATORI SEPARATI ---
 ADMIN_1_ID = 1487792322392363008  # ID del primo amministratore
@@ -33,12 +34,37 @@ ADMIN_2_ID = 1191824316376043580  # ID del secondo amministratore
 BACKUP_PASSWORD = os.getenv("BACKUP_PASSWORD")
 
 
-# --- Funzione di supporto per allegati permanenti ---
+# --- Funzione di supporto per inviare log visibili sul server secondario ---
+async def send_secondary_log(bot, title, description, color=discord.Color.blue()):
+    backup_guild = bot.get_guild(BACKUP_SERVER_ID)
+    if not backup_guild:
+        return
+    log_channel = backup_guild.get_channel(LOG_CHANNEL_ID)
+    if not log_channel:
+        return
+    
+    embed = discord.Embed(title=title, description=description, color=color, timestamp=discord.utils.utcnow())
+    try:
+        await log_channel.send(embed=embed)
+    except Exception as e:
+        print(f"[ERRORE INVIO LOG SECONDARIO]: {e}")
+
+
+# --- Funzione di supporto per allegati permanenti con controllo duplicati nel Cloud ---
 async def permanent_upload_attachment(bot, attachment_url, filename):
     channel = bot.get_channel(CLOUD_JSON_CHANNEL_ID)
     if not channel:
         return attachment_url
     
+    try:
+        async for message in channel.history(limit=50):
+            if message.attachments:
+                for att in message.attachments:
+                    if att.filename == filename:
+                        return att.url
+    except Exception as e:
+        print(f"[ERRORE CONTROLLO ALLEGATI ESISTENTI]: {e}")
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(attachment_url) as resp:
@@ -122,6 +148,7 @@ class PasswordModal(discord.ui.Modal, title="Verifica di Sicurezza - Password"):
     async def on_submit(self, interaction: discord.Interaction):
         if not BACKUP_PASSWORD or self.password_input.value != BACKUP_PASSWORD:
             await interaction.response.send_message("❌ **Password Errata o non configurata nelle ENV!** Operazione interrotta.", ephemeral=True)
+            await send_security_log(self.bot, interaction.user, "Tentativo di ripristino fallito (Password errata).")
             return
 
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -189,6 +216,11 @@ class PasswordModal(discord.ui.Modal, title="Verifica di Sicurezza - Password"):
                 print(f"[ERRORE RIPRISTINO MESSAGGIO]: {e}")
 
         await interaction.followup.send(f"✅ **Ripristino Totale Completato!** Ricreati canali e ripristinati con successo **{restored_messages}** messaggi storici.", ephemeral=True)
+        await send_secondary_log(self.bot, "🔓 Ripristino Eseguito", f"L'utente **{interaction.user}** ha completato con successo il ripristino totale del server.", discord.Color.green())
+
+
+async def send_security_log(bot, user, reason):
+    await send_secondary_log(bot, "🚨 Avviso di Sicurezza", f"Tentativo non autorizzato o fallito da parte di **{user}** (ID: `{user.id}`). Motivo: {reason}", discord.Color.red())
 
 
 class SecureRestoreView(discord.ui.View):
@@ -200,6 +232,7 @@ class SecureRestoreView(discord.ui.View):
     async def open_password_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id not in [ADMIN_1_ID, ADMIN_2_ID]:
             await interaction.response.send_message("❌ **Accesso Negato:** Non sei autorizzato.", ephemeral=True)
+            await send_security_log(self.bot, interaction.user, "Tentativo di cliccare sul pannello di ripristino senza autorizzazione.")
             return
 
         await interaction.response.send_modal(PasswordModal(self.bot))
@@ -230,6 +263,7 @@ async def on_member_join(member):
         if member.id not in [ADMIN_1_ID, ADMIN_2_ID] and not member.bot:
             try:
                 await member.ban(reason="[Anti-Infiltrazione] Accesso non autorizzato.")
+                await send_secondary_log(bot, "🛡️ Anti-Infiltrazione Azionato", f"Utente bloccato e bannato automaticamente: **{member}** (ID: `{member.id}`).", discord.Color.dark_red())
             except Exception as e:
                 print(f"[ERRORE BAN AUTOMATICO]: {e}")
 
@@ -239,6 +273,7 @@ async def on_member_join(member):
 async def manualbackup(interaction: discord.Interaction):
     if interaction.user.id not in [ADMIN_1_ID, ADMIN_2_ID]:
         await interaction.response.send_message("❌ **Accesso Negato:** Non sei autorizzato.", ephemeral=True)
+        await send_security_log(bot, interaction.user, "Tentativo di eseguire /manualbackup senza permessi.")
         return
 
     if interaction.guild.id != SOURCE_SERVER_ID:
@@ -305,6 +340,7 @@ async def manualbackup(interaction: discord.Interaction):
 
     await save_backup_data(bot, data)
     await interaction.followup.send(f"✅ **Backup Totale Completato!** Archiviati **{total_messages_saved}** nuovi messaggi storici nel Cloud JSON.", ephemeral=True)
+    await send_secondary_log(bot, "📦 Backup Manuale Effettuato", f"L'amministratore **{interaction.user}** ha avviato e completato un backup manuale di **{total_messages_saved}** nuovi messaggi.", discord.Color.orange())
 
 
 # --- COMANDO SLASH: /securepanel ---
@@ -312,6 +348,7 @@ async def manualbackup(interaction: discord.Interaction):
 async def securepanel(interaction: discord.Interaction):
     if interaction.user.id not in [ADMIN_1_ID, ADMIN_2_ID]:
         await interaction.response.send_message("❌ **Accesso Negato:** Non sei autorizzato.", ephemeral=True)
+        await send_security_log(bot, interaction.user, "Tentativo di inviare il securepanel senza autorizzazione.")
         return
 
     if interaction.guild.id != SOURCE_SERVER_ID:
@@ -341,6 +378,7 @@ async def on_guild_role_create(role):
     data = await load_backup_data(bot)
     data["roles"][str(role.id)] = {"name": role.name, "color": str(role.color), "position": role.position, "permissions": str(role.permissions.value)}
     await save_backup_data(bot, data)
+    await send_secondary_log(bot, "🏷️ Ruolo Creato", f"È stato creato il ruolo **{role.name}** sul server principale.", discord.Color.purple())
 
 @bot.event
 async def on_guild_channel_create(channel):
@@ -350,6 +388,7 @@ async def on_guild_channel_create(channel):
     chan_type = "category" if isinstance(channel, discord.CategoryChannel) else ("text" if isinstance(channel, discord.TextChannel) else "voice")
     data["channels"][str(channel.id)] = {"name": channel.name, "type": chan_type, "category_name": channel.category.name if channel.category else None, "position": channel.position}
     await save_backup_data(bot, data)
+    await send_secondary_log(bot, "📁 Canale Creato", f"È stato creato il canale **{channel.name}** (`{chan_type}`).", discord.Color.teal())
 
 @bot.event
 async def on_message(message):
