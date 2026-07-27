@@ -215,6 +215,7 @@ class ModuleSelect(discord.ui.Select):
         super().__init__(placeholder="Seleziona un modulo di sicurezza da configurare...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
+        # Rispondiamo subito modificando il messaggio per evitare qualsiasi timeout
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
         
@@ -281,7 +282,7 @@ class ModuleSettingsModal(discord.ui.Modal, title="Modifica Parametri Modulo"):
         curr_timeout = str(config_data["security"][module_key].get("timeout_minutes", 1))
         
         self.action_input = discord.ui.TextInput(
-            label="Azione (delete, timeout, kick, ban, remove_perms)",
+            label="Azione (delete, timeout, kick, ban...)",
             default=curr_action,
             required=True,
             max_length=20
@@ -297,7 +298,7 @@ class ModuleSettingsModal(discord.ui.Modal, title="Modifica Parametri Modulo"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
-            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+            return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
             
         new_action = self.action_input.value.strip().lower()
         config_data["security"][self.module_key]["action"] = new_action
@@ -317,11 +318,16 @@ class SettingsMainView(discord.ui.View):
 
     @discord.ui.button(label="Global Whitelist", style=discord.ButtonStyle.success, emoji="🌐", row=1)
     async def global_whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         modal = GlobalWhitelistModal()
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="Configura Canali Log", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
     async def log_channels_view(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
         view = LogChannelSelectView()
         embed = discord.Embed(
             title="📋 Seleziona Categoria Log da Configurare",
@@ -445,10 +451,11 @@ class LogChannelIdModal(discord.ui.Modal, title="Imposta ID Canale Log"):
         await interaction.response.send_message(f"✅ Canale log per `{self.log_type}` impostato con successo su <#{ch_val}>!", ephemeral=True)
 
 
-@bot.tree.command(name="settings", description="Apre il pannello di controllo completo e interattivo del bot")
-async def settings_command(interaction: discord.Interaction):
+# NOTA: Assicurati che il nome del comando combaci esattamente con quello che usi nel server (es. setting o settings)
+@bot.tree.command(name="setting", description="Apre il pannello di controllo completo e interattivo del bot")
+async def setting_command(interaction: discord.Interaction):
     if not await is_owner_or_guild_owner(interaction):
-        return await interaction.response.send_message("❌ Questo comando può essere eseguito solo dal proprietario del bot o dal proprietario del server.", ephemeral=True)
+        return await interaction.response.send_message("❌ Questo comando può essere eseguito solo dal proprietario del bot o del server.", ephemeral=True)
     
     embed = discord.Embed(
         title="🎛️ Pannello di Controllo - Security & Logs",
@@ -457,7 +464,6 @@ async def settings_command(interaction: discord.Interaction):
     )
     view = SettingsMainView(interaction)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
 
 # ==========================================
 # 🛡️ FUNZIONI DI UTILITÀ PER LA SICUREZZA
