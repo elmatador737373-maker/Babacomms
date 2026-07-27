@@ -21,6 +21,7 @@ intents.guilds = True
 # ID delle categorie o dei ruoli (Modifica con i tuoi dati)
 SUPPORT_ROLE_ID = 1352284377698144336  # ID del ruolo Staff
 CATEGORY_TICKET_ID = 1352281057273188354 # ID della categoria dove creare i ticket
+TICKET_LOG_CHANNEL_ID = 1494425912727572611 # ID del canale in cui inviare i log e i transcript
 
 
 # --- Modal per la richiesta di unban ---
