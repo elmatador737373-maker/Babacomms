@@ -238,7 +238,7 @@ async def on_member_remove(member):
             ),
             color=discord.Color.red()
         )
-        embed.set_image(url="attachment://addio.png")
+        embed.set_image(url="attachment://partenza.jpeg")
         await channel.send(file=file, embed=embed)
 
 
