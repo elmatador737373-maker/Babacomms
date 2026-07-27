@@ -18,11 +18,9 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
-
 # ID delle categorie o dei ruoli (Modifica con i tuoi dati)
-SUPPORT_ROLE_ID = 1352284377698144336  # ID del ruolo Staff
-CATEGORY_TICKET_ID = 1352281057273188354 # ID della categoria dove creare i ticket
+SUPPORT_ROLE_ID = 123456789012345678  # ID del ruolo Staff
+CATEGORY_TICKET_ID = 123456789012345678 # ID della categoria dove creare i ticket
 
 
 # --- Modal per la richiesta di unban ---
@@ -109,7 +107,8 @@ class UnbanSelect(discord.ui.Select):
                 value="open_unban_ticket"
             )
         ]
-        super().__init__(placeholder="Seleziona dal menù per aprire una richiesta...", min_values=1, max_values=1, options=options)
+        # Assegniamo un custom_id fisso fondamentale per la persistenza
+        super().__init__(placeholder="Seleziona dal menù per aprire una richiesta...", min_values=1, max_values=1, options=options, custom_id="unban_persistent_select")
 
     async def callback(self, interaction: discord.Interaction):
         if self.values[0] == "open_unban_ticket":
@@ -117,7 +116,7 @@ class UnbanSelect(discord.ui.Select):
 
 class UnbanDropView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__(timeout=None) # Timeout None rende la view persistente
         self.add_item(UnbanSelect())
 
 class TicketCloseView(discord.ui.View):
@@ -129,11 +128,23 @@ class TicketCloseView(discord.ui.View):
         await interaction.response.send_message("🔒 Chiusura del ticket in corso...", ephemeral=True)
         await interaction.channel.delete()
 
-@bot.event
-async def on_ready():
-    bot.add_view(UnbanDropView())
-    bot.add_view(TicketCloseView())
-    print(f'Bot loggato come {bot.user} (ID: {bot.user.id})')
+
+# --- Sottoclasse del Bot per gestire correttamente la persistenza tramite setup_hook ---
+class PersistentBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        # Registriamo le viste in modo persistente prima che il bot sia pronto
+        self.add_view(UnbanDropView())
+        self.add_view(TicketCloseView())
+        print("✅ Viste persistenti caricate correttamente.")
+
+    async def on_ready(self):
+        print(f'Bot loggato come {self.user} (ID: {self.user.id})')
+
+bot = PersistentBot()
+
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -149,19 +160,20 @@ async def panel(ctx):
             "• **Fornisci informazioni veritiere.**\n\n"
             "📌 **Una seconda possibilità non viene regalata, si conquista.**\n"
             "📌 **Ogni errore può diventare un'opportunità per migliorare.**\n\n"
-            "🔓 **Se ritieni che il tuo ban debba essere rivalutato, spiega la situazione con sincerità e attenzione.**\n"
+            "🔓 **Se ritieni che il ban debba essere rivalutato, spiega la situazione con sincerità e attenzione.**\n"
             "📩 **Seleziona dal menù qui sotto per aprire una richiesta.**\n\n"
             "ServerUnban: *Dimostra chi sei oggi, non chi eri ieri.*"
         ),
         color=discord.Color.from_rgb(43, 45, 49)
     )
     
-    # Aggiunge l'immagine tramite link Imgur al pannello
-    embed.set_image(url="https://imgur.com/a/8Qjcs00")
+    # Inserisci qui il tuo link Imgur
+    embed.set_image(url="IL_TUO_LINK_IMGUR")
     
     view = UnbanDropView()
     await ctx.send(embed=embed, view=view)
     await ctx.message.delete()
+
 
 if __name__ == "__main__":
     import threading
