@@ -194,6 +194,11 @@ class PersistentBot(commands.Bot):
 
     async def on_ready(self):
         print(f'Bot loggato come {self.user} (ID: {self.user.id})')
+        try:
+            synced = await self.tree.sync()
+            print(f"Sincronizzati {len(synced)} comandi slash.")
+        except Exception as e:
+            print(f"Errore nella sincronizzazione dei comandi: {e}")
 
 bot = PersistentBot()
 
@@ -215,7 +220,6 @@ async def on_member_join(member):
 
     if channel:
         try:
-            # Controllo esistenza file fisico nella repository
             file_path = "file_00000000125c720a85fa9d73a34549c7.png"
             file_esiste = os.path.exists(file_path)
             print(f"[DEBUG JOIN] Il file '{file_path}' esiste nella cartella? -> {file_esiste}")
@@ -270,7 +274,6 @@ async def on_member_remove(member):
 
     if channel:
         try:
-            # Controllo esistenza file fisico nella repository
             file_path = "partenza.jpeg"
             file_esiste = os.path.exists(file_path)
             print(f"[DEBUG REMOVE] Il file '{file_path}' esiste nella cartella? -> {file_esiste}")
