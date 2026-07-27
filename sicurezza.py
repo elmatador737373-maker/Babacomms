@@ -276,7 +276,7 @@ class ModuleConfigView(discord.ui.View):
             description="Usa i menu e i pulsanti sottostanti per configurare interamente i sistemi di sicurezza e log.",
             color=discord.Color.dark_blue()
         )
-        view = SettingsMainView(interaction)
+        view = SettingsMainView(interaction.guild)
         await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -317,92 +317,88 @@ class ModuleSettingsModal(discord.ui.Modal, title="Modifica Parametri Modulo"):
         await interaction.response.send_message(f"✅ Parametri aggiornati con successo per `{self.module_key}`!", ephemeral=True)
 
 
-class SettingsMainView(discord.ui.View):
-    def __init__(self, inter: discord.Interaction):
+# --- GESTIONE GLOBAL WHITELIST INTERATTIVA (RUOLI & UTENTI) ---
+
+class GlobalWhitelistView(discord.ui.View):
+    def __init__(self):
         super().__init__(timeout=180)
-        self.inter = inter
-        self.add_item(ModuleSelect())
 
-    @discord.ui.button(label="Global Whitelist", style=discord.ButtonStyle.success, emoji="🌐", row=1)
-    async def global_whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await is_owner_or_guild_owner(interaction):
-            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        modal = GlobalWhitelistModal()
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Configura Canali Log", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
-    async def log_channels_view(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder="Seleziona un ruolo dalla lista...", min_values=1, max_values=1, row=0)
+    async def select_role(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
-        view = LogChannelSelectView()
-        embed = discord.Embed(
-            title="📋 Configurazione Canali Log",
-            description="Scegli dal menu a tendina quale categoria di log associare a uno specifico canale.",
-            color=discord.Color.blurple()
-        )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        role = select.values[0]
+        view = WhitelistActionConfirmView(target_id=role.id, target_name=role.name, is_role=True)
+        await interaction.response.edit_message(content=f"⚙️ Ruolo selezionato: **{role.name}**\nCosa desideri fare?", view=view, embed=None)
 
-
-class GlobalWhitelistModal(discord.ui.Modal, title="Gestione Global Whitelist"):
-    target_id = discord.ui.TextInput(
-        label="ID Utente o Ruolo da Whitelistare",
-        placeholder="Inserisci l'ID numerico esatto...",
-        required=True,
-        max_length=25
-    )
-    action_type = discord.ui.TextInput(
-        label="Azione (aggiungi / rimuovi)",
-        placeholder="Scrivi 'aggiungi' o 'rimuovi'",
-        required=True,
-        max_length=10
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
+    @discord.ui.select(cls=discord.ui.UserSelect, placeholder="Seleziona un utente dalla lista...", min_values=1, max_values=1, row=1)
+    async def select_user(self, interaction: discord.Interaction, select: discord.ui.UserSelect):
         if not await is_owner_or_guild_owner(interaction):
-            return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
-
-        try:
-            target_val = int(self.target_id.value.strip())
-        except ValueError:
-            return await interaction.response.send_message("❌ L'ID inserito non è valido.", ephemeral=True)
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
-        action = self.action_type.value.strip().lower()
-        if action not in ["aggiungi", "rimuovi"]:
-            return await interaction.response.send_message("❌ Azione non valida. Scrivi 'aggiungi' o 'rimuovi'.", ephemeral=True)
+        user = select.values[0]
+        view = WhitelistActionConfirmView(target_id=user.id, target_name=str(user), is_role=False)
+        await interaction.response.edit_message(content=f"⚙️ Utente selezionato: **{user}**\nCosa desideri fare?", view=view, embed=None)
 
-        is_role = interaction.guild.get_role(target_val) is not None
+
+class WhitelistActionConfirmView(discord.ui.View):
+    def __init__(self, target_id: int, target_name: str, is_role: bool):
+        super().__init__(timeout=180)
+        self.target_id = target_id
+        self.target_name = target_name
+        self.is_role = is_role
+
+    @discord.ui.button(label="Aggiungi alla Whitelist", style=discord.ButtonStyle.success, emoji="✅")
+    async def add_wh(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
         updated_count = 0
         for module_name, module_config in config_data["security"].items():
-            if is_role:
+            if self.is_role:
                 lst = module_config.setdefault("whitelist_roles", [])
-                if action == "aggiungi" and target_val not in lst:
-                    lst.append(target_val)
-                    updated_count += 1
-                elif action == "rimuovi" and target_val in lst:
-                    lst.remove(target_val)
+                if self.target_id not in lst:
+                    lst.append(self.target_id)
                     updated_count += 1
             else:
                 lst = module_config.setdefault("whitelist_users", [])
-                if action == "aggiungi" and target_val not in lst:
-                    lst.append(target_val)
-                    updated_count += 1
-                elif action == "rimuovi" and target_val in lst:
-                    lst.remove(target_val)
+                if self.target_id not in lst:
+                    lst.append(self.target_id)
                     updated_count += 1
 
         discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
-        
-        tipo_str = "Ruolo" if is_role else "Utente"
-        await interaction.response.send_message(
-            f"✅ Operazione completata! {tipo_str} (`{target_val}`) {'aggiunto a ' + str(updated_count) + ' moduli' if action == 'aggiungi' else 'rimosso da tutti i moduli'}.",
-            ephemeral=True
-        )
+        tipo = "Ruolo" if self.is_role else "Utente"
+        await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) aggiunto con successo a **{updated_count}** moduli di sicurezza!", view=None)
 
+    @discord.ui.button(label="Rimuovi dalla Whitelist", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def remove_wh(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
+        updated_count = 0
+        for module_name, module_config in config_data["security"].items():
+            if self.is_role:
+                lst = module_config.setdefault("whitelist_roles", [])
+                if self.target_id in lst:
+                    lst.remove(self.target_id)
+                    updated_count += 1
+            else:
+                lst = module_config.setdefault("whitelist_users", [])
+                if self.target_id in lst:
+                    lst.remove(self.target_id)
+                    updated_count += 1
+
+        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
+        tipo = "Ruolo" if self.is_role else "Utente"
+        await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) rimosso con successo da **{updated_count}** moduli.", view=None)
+
+
+# --- CONFIGURAZIONE CANALI LOG CON SELETTORI INTERATTIVI ---
 
 class LogChannelSelect(discord.ui.Select):
-    def __init__(self):
+    def __init__(self, guild: discord.Guild):
+        self.guild = guild
         options = [
             discord.SelectOption(label="Messaggi (messages)", value="messages", description="Log eliminazione e modifica messaggi"),
             discord.SelectOption(label="Membri (members)", value="members", description="Log ingressi, uscite, ban e timeout"),
@@ -412,54 +408,101 @@ class LogChannelSelect(discord.ui.Select):
             discord.SelectOption(label="Server (server)", value="server", description="Log generali di server"),
             discord.SelectOption(label="Sicurezza (security)", value="security", description="Log di tutti i moduli di protezione"),
         ]
-        super().__init__(placeholder="Seleziona la categoria di log...", min_values=1, max_values=1, options=options)
+        super().__init__(placeholder="Seleziona la categoria di log da configurare...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
         log_type = self.values[0]
-        modal = LogChannelIdModal(log_type)
-        await interaction.response.send_modal(modal)
+        view = ChannelPickerView(log_type, self.guild)
+        embed = discord.Embed(
+            title=f"📋 Scegli il canale per: `{log_type}`",
+            description="Seleziona il canale di testo desiderato dal menu sottostante.",
+            color=discord.Color.blurple()
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ChannelPickerSelect(discord.ui.Select):
+    def __init__(self, log_type: str, guild: discord.Guild):
+        self.log_type = log_type
+        text_channels = [ch for ch in guild.text_channels][:25]
+        
+        options = [
+            discord.SelectOption(label=f"#{ch.name}", value=str(ch.id), description=f"ID: {ch.id}")
+            for ch in text_channels
+        ]
+        if not options:
+            options.append(discord.SelectOption(label="Nessun canale disponibile", value="none"))
+            
+        super().__init__(placeholder="Scegli il canale...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+            
+        if self.values[0] == "none":
+            return await interaction.response.send_message("❌ Nessun canale valido selezionato.", ephemeral=True)
+            
+        ch_id = int(self.values[0])
+        
+        if "log_channels" not in config_data:
+            config_data["log_channels"] = {}
+        config_data["log_channels"][self.log_type] = ch_id
+        
+        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
+        await interaction.response.edit_message(content=f"✅ Canale log per `{self.log_type}` impostato con successo su <#{ch_id}>!", embed=None, view=None)
+
+
+class ChannelPickerView(discord.ui.View):
+    def __init__(self, log_type: str, guild: discord.Guild):
+        super().__init__(timeout=180)
+        self.add_item(ChannelPickerSelect(log_type, guild))
 
 
 class LogChannelSelectView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, guild: discord.Guild):
         super().__init__(timeout=180)
-        self.add_item(LogChannelSelect())
+        self.add_item(LogChannelSelect(guild))
 
 
-class LogChannelIdModal(discord.ui.Modal, title="Imposta ID Canale Log"):
-    def __init__(self, log_type: str):
-        super().__init__()
-        self.log_type = log_type
-        
-        curr_id = config_data.get("log_channels", {}).get(log_type, "")
-        self.channel_id_input = discord.ui.TextInput(
-            label=f"ID del canale per '{log_type}'",
-            placeholder="Inserisci l'ID numerico esatto del canale...",
-            default=str(curr_id) if curr_id else "",
-            required=True,
-            max_length=25
-        )
-        self.add_item(self.channel_id_input)
+# --- VISTA PRINCIPALE DEL PANNELLO ---
 
-    async def on_submit(self, interaction: discord.Interaction):
+class SettingsMainView(discord.ui.View):
+    def __init__(self, guild: discord.Guild):
+        super().__init__(timeout=180)
+        self.guild = guild
+        self.add_item(ModuleSelect())
+
+    @discord.ui.button(label="Global Whitelist", style=discord.ButtonStyle.success, emoji="🌐", row=1)
+    async def global_whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
-            return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
-            
-        try:
-            ch_val = int(self.channel_id_input.value.strip())
-        except ValueError:
-            return await interaction.response.send_message("❌ ID canale non valido. Deve essere numerico.", ephemeral=True)
-            
-        if "log_channels" not in config_data:
-            config_data["log_channels"] = {}
-        config_data["log_channels"][self.log_type] = ch_val
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         
-        discord.utils.run_coroutine_threadsafe(save_config_to_supabase(), bot.loop)
-        await interaction.response.send_message(f"✅ Canale log per `{self.log_type}` impostato con successo su <#{ch_val}>!", ephemeral=True)
+        view = GlobalWhitelistView()
+        embed = discord.Embed(
+            title="🌐 Gestione Global Whitelist",
+            description="Usa i menu a tendina sottostanti per selezionare direttamente un **ruolo** o un **utente** da aggiungere o rimuovere dai controlli di sicurezza.",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+    @discord.ui.button(label="Configura Canali Log", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
+    async def log_channels_view(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
+        view = LogChannelSelectView(interaction.guild)
+        embed = discord.Embed(
+            title="📋 Configurazione Canali Log",
+            description="Scegli dal menu a tendina quale categoria di log associare a uno specifico canale.",
+            color=discord.Color.blurple()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+# --- COMANDO SLASH PRINCIPALE ---
 
 @bot.tree.command(name="setting", description="Apre il pannello di controllo completo e interattivo di Madison State")
 async def setting_command(interaction: discord.Interaction):
@@ -471,9 +514,8 @@ async def setting_command(interaction: discord.Interaction):
         description="Gestisci in modo centralizzato tutti i protocolli di sicurezza, le whitelist e i canali log istituzionali.",
         color=discord.Color.dark_blue()
     )
-    view = SettingsMainView(interaction)
+    view = SettingsMainView(interaction.guild)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
 
 # ==========================================
 # 🛡️ FUNZIONI DI UTILITÀ PER LA SICUREZZA
