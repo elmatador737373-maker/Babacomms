@@ -23,7 +23,50 @@ intents.members = True # Necessario per rilevare gli ingressi e le uscite dei me
 SUPPORT_ROLE_ID = 1352284377698144336  # ID del ruolo Staff
 CATEGORY_TICKET_ID = 1352281057273188354 # ID della categoria dove creare i ticket
 TICKET_LOG_CHANNEL_ID = 1494425912727572611 # ID del canale in cui inviare i log e i transcript
+WELCOME_CHANNEL_ID = 1352287128532418632 # ID del canale Benvenuto
+GOODBYE_CHANNEL_ID = 1494373723199901887 # ID del canale Arrivederci (Leave)
 
+
+# --- Eventi di Benvenuto e Arrivederci (Leave) ---
+@bot.event
+async def on_member_join(member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(
+            title="🎉 • ʙᴇɴᴠᴇɴᴜᴛᴏ",
+            description=(
+                f"👋 Benvenuto {member.mention} nella zona Unban di Madison State Full RP!\n"
+                f"➢ 📍 Qui potrai richiedere assistenza riguardo ban, blacklist e controlli staff.\n"
+                f"➢ 📍 Leggi attentamente la guida sban nel canale <#1352295921999937686>.\n"
+                f"➢ 📍 Compila correttamente tutti i moduli richiesti.\n"
+                f"➢ 📍 Mantieni sempre un comportamento rispettoso verso lo staff.\n\n"
+                f"📌 Una richiesta ben compilata velocizzerà la revisione del tuo caso.\n"
+                f"💬 Per qualsiasi dubbio apri un ticket assistenza."
+            ),
+            color=discord.Color.green()
+        )
+        embed.set_image(url="https://imgur.com/a/rbbN8v4")
+        await channel.send(embed=embed)
+
+
+@bot.event
+async def on_member_remove(member):
+    channel = member.guild.get_channel(GOODBYE_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(
+            title="✈️ • ᴘᴀʀᴛᴇɴᴢᴀ",
+            description=(
+                f"👋 Il volo di {member.mention} è ufficialmente partito da Madison State Full RP!\n"
+                f"➢ 📍 Grazie per aver giocato con noi.\n"
+                f"➢ 📍 Speriamo di rivederti presto nella città di Madison.\n"
+                f"➢ 📍 Ogni storia lascia il segno… la tua continuerà altrove.\n\n"
+                f"📌 Ti auguriamo buona fortuna per il tuo prossimo percorso RP!\n"
+                f"💬 Arrivederci da tutta la community di Madison State FRP."
+            ),
+            color=discord.Color.red()
+        )
+        embed.set_image(url="IL_TUO_LINK_IMGUR_GOODBYE")
+        await channel.send(embed=embed)
 
 # --- Modal per la richiesta di unban ---
 class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
