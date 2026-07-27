@@ -47,15 +47,15 @@ intents.invites = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 DEFAULT_SECURITY_CONFIG = {
-    "anti_link": {"enabled": True, "action": "delete", "timeout_minutes": 1},
-    "anti_invite": {"enabled": True, "action": "timeout", "timeout_minutes": 5},
-    "anti_spam": {"enabled": True, "action": "timeout", "timeout_minutes": 1},
-    "anti_bot_add": {"enabled": True, "action": "kick"},
-    "anti_role_create": {"enabled": True, "action": "delete"},
-    "anti_role_delete": {"enabled": True, "action": "kick"},
-    "anti_dangerous_role": {"enabled": True, "action": "remove_perms"},
-    "anti_channel_create": {"enabled": True, "action": "delete"},
-    "anti_channel_delete": {"enabled": True, "action": "kick"}
+    "anti_link": {"enabled": True, "action": "delete", "timeout_minutes": 1, "whitelist": []},
+    "anti_invite": {"enabled": True, "action": "timeout", "timeout_minutes": 5, "whitelist": []},
+    "anti_spam": {"enabled": True, "action": "timeout", "timeout_minutes": 1, "whitelist": []},
+    "anti_bot_add": {"enabled": True, "action": "kick", "whitelist": []},
+    "anti_role_create": {"enabled": True, "action": "delete", "whitelist": []},
+    "anti_role_delete": {"enabled": True, "action": "kick", "whitelist": []},
+    "anti_dangerous_role": {"enabled": True, "action": "remove_perms", "whitelist": []},
+    "anti_channel_create": {"enabled": True, "action": "delete", "whitelist": []},
+    "anti_channel_delete": {"enabled": True, "action": "kick", "whitelist": []}
 }
 
 DEFAULT_LOG_CHANNELS = {
@@ -76,6 +76,16 @@ async def load_settings_from_db():
         res_sec = supabase.table("bot_settings").select("*").eq("key", "security").execute()
         if not res_sec.data:
             supabase.table("bot_settings").upsert({"key": "security", "value": DEFAULT_SECURITY_CONFIG}).execute()
+        else:
+            # Compatibilità per vecchi record senza la chiave whitelist nei singoli moduli
+            data = res_sec.data[0]["value"]
+            updated = False
+            for mod in DEFAULT_SECURITY_CONFIG:
+                if mod in data and "whitelist" not in data[mod]:
+                    data[mod]["whitelist"] = []
+                    updated = True
+            if updated:
+                supabase.table("bot_settings").upsert({"key": "security", "value": data}).execute()
         
         res_log = supabase.table("bot_settings").select("*").eq("key", "log_channels").execute()
         if not res_log.data:
@@ -116,7 +126,7 @@ def save_db_log_channels(data):
         print(f"[ERRORE SALVATAGGIO LOGS DB]: {e}")
 
 
-# --- FUNZIONI WHITELIST DATABASE ---
+# --- FUNZIONI WHITELIST (Globale + Categoria) ---
 
 def is_whitelisted_db(member: discord.Member) -> bool:
     if not member:
@@ -134,6 +144,18 @@ def is_whitelisted_db(member: discord.Member) -> bool:
                     return True
     except Exception:
         pass
+    return False
+
+def is_module_whitelisted(member: discord.Member, module_key: str) -> bool:
+    if is_whitelisted_db(member):
+        return True
+    sec = get_db_security()
+    mod_whitelist = sec.get(module_key, {}).get("whitelist", [])
+    if member.id in mod_whitelist:
+        return True
+    for role in member.roles:
+        if role.id in mod_whitelist:
+            return True
     return False
 
 
@@ -245,7 +267,7 @@ async def on_member_join(member: discord.Member):
             except:
                 pass
 
-            if adder and not (adder.guild_permissions.administrator or is_whitelisted_db(adder)):
+            if adder and not is_module_whitelisted(adder, "anti_bot_add"):
                 action = sec.get("action", "kick")
                 action_desc = await apply_generic_action(guild, adder, action, "Aggiunta bot non autorizzata")
                 try:
@@ -417,10 +439,12 @@ class ModuleSelect(discord.ui.Select):
         mod_info = security_config.get(module_key, {})
         
         status_str = "✅ Abilitato" if mod_info.get("enabled") else "❌ Disabilitato"
+        wl_count = len(mod_info.get("whitelist", []))
         desc = (
             f"**Modulo Selezionato:** `{module_key.replace('_', ' ').title()}`\n"
             f"**Stato Attuale:** {status_str}\n"
             f"**Azione:** `{mod_info.get('action', 'N/D')}`\n"
+            f"**Elementi in Whitelist Categoria:** `{wl_count}`\n"
         )
         if "timeout_minutes" in mod_info:
             desc += f"**Durata Timeout:** `{mod_info.get('timeout_minutes')} minuti`\n"
@@ -434,7 +458,7 @@ class ModuleConfigView(discord.ui.View):
         super().__init__(timeout=180)
         self.module_key = module_key
 
-    @discord.ui.button(label="Attiva/Disattiva", style=discord.ButtonStyle.blurple, emoji="🔄")
+    @discord.ui.button(label="Attiva/Disattiva", style=discord.ButtonStyle.blurple, emoji="🔄", row=0)
     async def toggle_enabled(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
@@ -446,14 +470,26 @@ class ModuleConfigView(discord.ui.View):
         
         await interaction.response.send_message(f"✅ Stato del modulo modificato a: **{'Abilitato' if not curr else 'Disabilitato'}**", ephemeral=True)
 
-    @discord.ui.button(label="Cambia Azione & Parametri", style=discord.ButtonStyle.green, emoji="⚙️")
+    @discord.ui.button(label="Cambia Parametri", style=discord.ButtonStyle.green, emoji="⚙️", row=0)
     async def change_action(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         modal = ModuleSettingsModal(self.module_key)
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="⬅️ Torna al Menu", style=discord.ButtonStyle.grey)
+    @discord.ui.button(label="Gestisci Whitelist Modulo", style=discord.ButtonStyle.secondary, emoji="🛡️", row=1)
+    async def manage_module_whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        view = ModuleWhitelistView(self.module_key)
+        embed = discord.Embed(
+            title=f"🛡️ Whitelist Categoria — {self.module_key.replace('_', ' ').title()}",
+            description="Seleziona un ruolo o utente da aggiungere o rimuovere dalla whitelist esclusiva di questo modulo.",
+            color=discord.Color.dark_green()
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="⬅️ Torna al Menu", style=discord.ButtonStyle.grey, row=1)
     async def back_to_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
@@ -496,6 +532,65 @@ class ModuleSettingsModal(discord.ui.Modal, title="Modifica Parametri Modulo"):
         await interaction.response.send_message(f"✅ Parametri aggiornati con successo per `{self.module_key}` nel DB!", ephemeral=True)
 
 
+# --- GESTIONE WHITELIST PER SINGOLA CATEGORIA ---
+
+class ModuleWhitelistView(discord.ui.View):
+    def __init__(self, module_key: str):
+        super().__init__(timeout=180)
+        self.module_key = module_key
+
+    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder="Seleziona un ruolo...", min_values=1, max_values=1, row=0)
+    async def select_role(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        role = select.values[0]
+        view = ModuleWhitelistActionView(self.module_key, role.id, role.name)
+        await interaction.response.edit_message(content=f"⚙️ Ruolo selezionato: **{role.name}**\nCosa desideri fare per questo modulo?", view=view, embed=None)
+
+    @discord.ui.select(cls=discord.ui.UserSelect, placeholder="Seleziona un utente...", min_values=1, max_values=1, row=1)
+    async def select_user(self, interaction: discord.Interaction, select: discord.ui.UserSelect):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        user = select.values[0]
+        view = ModuleWhitelistActionView(self.module_key, user.id, str(user))
+        await interaction.response.edit_message(content=f"⚙️ Utente selezionato: **{user}**\nCosa desideri fare per questo modulo?", view=view, embed=None)
+
+
+class ModuleWhitelistActionView(discord.ui.View):
+    def __init__(self, module_key: str, target_id: int, target_name: str):
+        super().__init__(timeout=180)
+        self.module_key = module_key
+        self.target_id = target_id
+        self.target_name = target_name
+
+    @discord.ui.button(label="Aggiungi alla Whitelist del Modulo", style=discord.ButtonStyle.success, emoji="✅")
+    async def add_mw(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
+        sec = get_db_security()
+        if "whitelist" not in sec[self.module_key]:
+            sec[self.module_key]["whitelist"] = []
+            
+        if self.target_id not in sec[self.module_key]["whitelist"]:
+            sec[self.module_key]["whitelist"].append(self.target_id)
+            save_db_security(sec)
+            
+        await interaction.response.edit_message(content=f"✅ Elemento **{self.target_name}** (`{self.target_id}`) aggiunto con successo alla whitelist del modulo `{self.module_key}`!", view=None)
+
+    @discord.ui.button(label="Rimuovi dalla Whitelist del Modulo", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def remove_mw(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        
+        sec = get_db_security()
+        if "whitelist" in sec[self.module_key] and self.target_id in sec[self.module_key]["whitelist"]:
+            sec[self.module_key]["whitelist"].remove(self.target_id)
+            save_db_security(sec)
+            
+        await interaction.response.edit_message(content=f"✅ Elemento **{self.target_name}** (`{self.target_id}`) rimosso dalla whitelist del modulo `{self.module_key}`!", view=None)
+
+
 # --- GESTIONE GLOBAL WHITELIST SU TABELLA DB ---
 
 class GlobalWhitelistView(discord.ui.View):
@@ -506,7 +601,6 @@ class GlobalWhitelistView(discord.ui.View):
     async def select_role(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        
         role = select.values[0]
         view = WhitelistActionConfirmView(target_id=role.id, target_name=role.name, target_type="role")
         await interaction.response.edit_message(content=f"⚙️ Ruolo selezionato: **{role.name}**\nCosa desideri fare?", view=view, embed=None)
@@ -515,7 +609,6 @@ class GlobalWhitelistView(discord.ui.View):
     async def select_user(self, interaction: discord.Interaction, select: discord.ui.UserSelect):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        
         user = select.values[0]
         view = WhitelistActionConfirmView(target_id=user.id, target_name=str(user), target_type="user")
         await interaction.response.edit_message(content=f"⚙️ Utente selezionato: **{user}**\nCosa desideri fare?", view=view, embed=None)
@@ -528,33 +621,29 @@ class WhitelistActionConfirmView(discord.ui.View):
         self.target_name = target_name
         self.target_type = target_type
 
-    @discord.ui.button(label="Aggiungi alla Whitelist", style=discord.ButtonStyle.success, emoji="✅")
+    @discord.ui.button(label="Aggiungi alla Global Whitelist", style=discord.ButtonStyle.success, emoji="✅")
     async def add_wh(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        
         try:
             supabase.table("bot_whitelist").upsert({
                 "id": self.target_id,
                 "target_type": self.target_type,
                 "target_name": self.target_name
             }, on_conflict="id").execute()
-            
             tipo = "Ruolo" if self.target_type == "role" else "Utente"
-            await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) aggiunto con successo alla tabella Whitelist del DB!", view=None)
+            await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) aggiunto con successo alla tabella Global Whitelist del DB!", view=None)
         except Exception as e:
             await interaction.response.edit_message(content=f"❌ Errore durante il salvataggio su Supabase: `{e}`", view=None)
 
-    @discord.ui.button(label="Rimuovi dalla Whitelist", style=discord.ButtonStyle.danger, emoji="🗑️")
+    @discord.ui.button(label="Rimuovi dalla Global Whitelist", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def remove_wh(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        
         try:
             supabase.table("bot_whitelist").delete().eq("id", self.target_id).execute()
-            
             tipo = "Ruolo" if self.target_type == "role" else "Utente"
-            await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) rimosso con successo dalla tabella Whitelist del DB!", view=None)
+            await interaction.response.edit_message(content=f"✅ {tipo} **{self.target_name}** (`{self.target_id}`) rimosso con successo dalla tabella Global Whitelist del DB!", view=None)
         except Exception as e:
             await interaction.response.edit_message(content=f"❌ Errore durante la rimozione su Supabase: `{e}`", view=None)
 
@@ -578,7 +667,6 @@ class LogChannelSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        
         log_type = self.values[0]
         view = ChannelPickerView(log_type, self.guild)
         embed = discord.Embed(
@@ -593,29 +681,23 @@ class ChannelPickerSelect(discord.ui.Select):
     def __init__(self, log_type: str, guild: discord.Guild):
         self.log_type = log_type
         text_channels = [ch for ch in guild.text_channels][:25]
-        
         options = [
             discord.SelectOption(label=f"#{ch.name}", value=str(ch.id), description=f"ID: {ch.id}")
             for ch in text_channels
         ]
         if not options:
             options.append(discord.SelectOption(label="Nessun canale disponibile", value="none"))
-            
         super().__init__(placeholder="Scegli il canale...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-            
         if self.values[0] == "none":
             return await interaction.response.send_message("❌ Nessun canale valido selezionato.", ephemeral=True)
-            
         ch_id = int(self.values[0])
-        
         logs = get_db_log_channels()
         logs[self.log_type] = ch_id
         save_db_log_channels(logs)
-        
         await interaction.response.edit_message(content=f"✅ Canale log per `{self.log_type}` impostato con successo su <#{ch_id}> nel DB!", embed=None, view=None)
 
 
@@ -641,7 +723,6 @@ class SettingsMainView(discord.ui.View):
     async def global_whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        
         view = GlobalWhitelistView()
         embed = discord.Embed(
             title="🌐 Gestione Global Whitelist (Database)",
@@ -654,7 +735,6 @@ class SettingsMainView(discord.ui.View):
     async def log_channels_view(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await is_owner_or_guild_owner(interaction):
             return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
-        
         view = LogChannelSelectView(interaction.guild)
         embed = discord.Embed(
             title="📋 Configurazione Canali Log",
@@ -668,7 +748,6 @@ class SettingsMainView(discord.ui.View):
 async def setting_command(interaction: discord.Interaction):
     if not await is_owner_or_guild_owner(interaction):
         return await interaction.response.send_message("❌ Questo comando può essere eseguito solo dal proprietario.", ephemeral=True)
-    
     embed = discord.Embed(
         title="🛡️ Madison State — Pannello di Controllo",
         description="Gestisci in modo centralizzato tutti i protocolli di sicurezza, le whitelist e i canali log istituzionali.",
@@ -709,7 +788,7 @@ async def on_message(message: discord.Message):
 
     # 1. Anti-Invite
     if sec.get("anti_invite", {}).get("enabled") and ("discord.gg/" in content_lower or "discord.com/invite/" in content_lower):
-        if not is_whitelisted_db(member):
+        if not is_module_whitelisted(member, "anti_invite"):
             action = sec["anti_invite"].get("action", "delete")
             minutes = sec["anti_invite"].get("timeout_minutes", 1)
             try:
@@ -736,7 +815,7 @@ async def on_message(message: discord.Message):
     # 2. Anti-Link
     if sec.get("anti_link", {}).get("enabled") and ("http://" in content_lower or "https://" in content_lower):
         if "discord.gg" not in content_lower and "youtube.com" not in content_lower:
-            if not is_whitelisted_db(member):
+            if not is_module_whitelisted(member, "anti_link"):
                 action = sec["anti_link"].get("action", "delete")
                 minutes = sec["anti_link"].get("timeout_minutes", 1)
                 try:
@@ -762,7 +841,7 @@ async def on_message(message: discord.Message):
 
     # 3. Anti-Spam
     if sec.get("anti_spam", {}).get("enabled"):
-        if not is_whitelisted_db(member):
+        if not is_module_whitelisted(member, "anti_spam"):
             user_id = member.id
             now = time.time()
             spam_tracker[user_id] = [t for t in spam_tracker[user_id] if now - t < 4]
