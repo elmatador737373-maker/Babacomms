@@ -38,7 +38,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.messages = True
-intents.roles = True
+# riga 'intents.roles = True' rimossa perché non esiste in discord.py
 
 class BackupBot(commands.Bot):
     def __init__(self):
