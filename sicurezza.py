@@ -5,8 +5,9 @@ import json
 import io
 import time
 from collections import defaultdict
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from flask import Flask, render_template_string, request, redirect, url_for
 import threading
+import logging
 
 # ==========================================
 # ⚙️ CONFIGURAZIONE INIZIALE
@@ -186,325 +187,360 @@ async def send_typed_log(guild: discord.Guild, log_type: str, embed: discord.Emb
 
 
 # ==========================================
-# 🌐 WEB DASHBOARD INTEGRATA (HTML + HTTP SERVER)
+# 🌐 FLASK WEB DASHBOARD (CON NOMI CANALI)
 # ==========================================
 
-class DashboardHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/":
-            self.send_response(200)
-            self.send_header("Content-type", "text/html; charset=utf-8")
-            self.end_headers()
+app = Flask(__name__)
+
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Bot Security & Logs Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 40px; }
+        .container { max-width: 950px; margin: auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        h1 { color: #38bdf8; text-align: center; margin-bottom: 30px; }
+        .section { margin-bottom: 25px; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid #334155; }
+        h3 { margin-top: 0; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+        label { display: block; margin: 10px 0; font-size: 14px; cursor: pointer; }
+        input[type="text"], select { width: 100%; padding: 10px; margin-top: 5px; background: #1e293b; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }
+        button { background: #0284c7; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #0369a1; }
+        .rule-box { background: #1e293b; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #475569; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Gestione Bot Security & Logs</h1>
+        <form method="POST" action="/update">
             
-            sec = config_data["security"]
-            log_c = config_data["log_channels"]
-            
-            html_content = f"""
-            <!DOCTYPE html>
-            <html lang="it">
-            <head>
-                <meta charset="UTF-8">
-                <title>Bot Security & Logs Dashboard</title>
-                <style>
-                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 40px; }}
-                    .container {{ max-width: 950px; margin: auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }}
-                    h1 {{ color: #38bdf8; text-align: center; margin-bottom: 30px; }}
-                    .section {{ margin-bottom: 25px; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid #334155; }}
-                    h3 {{ margin-top: 0; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 8px; }}
-                    label {{ display: block; margin: 10px 0; font-size: 14px; cursor: pointer; }}
-                    input[type="text"], select {{ width: 100%; padding: 10px; margin-top: 5px; background: #1e293b; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }}
-                    button {{ background: #0284c7; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.2s; }}
-                    button:hover {{ background: #0369a1; }}
-                    .rule-box {{ background: #1e293b; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #475569; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>🛡️ Gestione Bot Security & Logs Avanzata</h1>
-                    <form method="POST" action="/update">
-                        
-                        <!-- ANTI-LINK -->
-                        <div class="section">
-                            <h3>🔗 Anti-Link</h3>
-                            <label><input type="checkbox" name="al_enabled" {"checked" if sec["anti_link"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="al_action">
-                                        <option value="delete" {"selected" if sec["anti_link"]["action"]=="delete" else ""}>Solo Elimina</option>
-                                        <option value="timeout" {"selected" if sec["anti_link"]["action"]=="timeout" else ""}>Timeout</option>
-                                        <option value="kick" {"selected" if sec["anti_link"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_link"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Durata Timeout (Min): <input type="text" name="al_time" value="{sec["anti_link"]["timeout_minutes"]}"></label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="al_w_users" value="{",".join(map(str, sec["anti_link"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="al_w_roles" value="{",".join(map(str, sec["anti_link"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-INVITE -->
-                        <div class="section">
-                            <h3>📨 Anti-Invite</h3>
-                            <label><input type="checkbox" name="ai_enabled" {"checked" if sec["anti_invite"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="ai_action">
-                                        <option value="delete" {"selected" if sec["anti_invite"]["action"]=="delete" else ""}>Solo Elimina</option>
-                                        <option value="timeout" {"selected" if sec["anti_invite"]["action"]=="timeout" else ""}>Timeout</option>
-                                        <option value="kick" {"selected" if sec["anti_invite"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_invite"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Durata Timeout (Min): <input type="text" name="ai_time" value="{sec["anti_invite"]["timeout_minutes"]}"></label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="ai_w_users" value="{",".join(map(str, sec["anti_invite"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="ai_w_roles" value="{",".join(map(str, sec["anti_invite"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-SPAM -->
-                        <div class="section">
-                            <h3>⚡ Anti-Spam</h3>
-                            <label><input type="checkbox" name="as_enabled" {"checked" if sec["anti_spam"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="as_action">
-                                        <option value="delete" {"selected" if sec["anti_spam"]["action"]=="delete" else ""}>Solo Elimina</option>
-                                        <option value="timeout" {"selected" if sec["anti_spam"]["action"]=="timeout" else ""}>Timeout</option>
-                                        <option value="kick" {"selected" if sec["anti_spam"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_spam"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Durata Timeout (Min): <input type="text" name="as_time" value="{sec["anti_spam"]["timeout_minutes"]}"></label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="as_w_users" value="{",".join(map(str, sec["anti_spam"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="as_w_roles" value="{",".join(map(str, sec["anti_spam"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-BOT ADD -->
-                        <div class="section">
-                            <h3>🤖 Anti-Bot Add</h3>
-                            <label><input type="checkbox" name="aba_enabled" {"checked" if sec["anti_bot_add"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="aba_action">
-                                        <option value="kick" {"selected" if sec["anti_bot_add"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_bot_add"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Whitelist ID Utenti autorizzati (virgola): <input type="text" name="aba_w_users" value="{",".join(map(str, sec["anti_bot_add"]["whitelist_users"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-ROLE CREATE -->
-                        <div class="section">
-                            <h3>🏷️ Anti-Role Create</h3>
-                            <label><input type="checkbox" name="arc_enabled" {"checked" if sec["anti_role_create"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="arc_action">
-                                        <option value="delete" {"selected" if sec["anti_role_create"]["action"]=="delete" else ""}>Elimina Ruolo</option>
-                                        <option value="kick" {"selected" if sec["anti_role_create"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_role_create"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="arc_w_users" value="{",".join(map(str, sec["anti_role_create"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="arc_w_roles" value="{",".join(map(str, sec["anti_role_create"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-ROLE DELETE -->
-                        <div class="section">
-                            <h3>🗑️ Anti-Role Delete</h3>
-                            <label><input type="checkbox" name="ard_enabled" {"checked" if sec["anti_role_delete"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="ard_action">
-                                        <option value="kick" {"selected" if sec["anti_role_delete"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_role_delete"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="ard_w_users" value="{",".join(map(str, sec["anti_role_delete"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="ard_w_roles" value="{",".join(map(str, sec["anti_role_delete"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-DANGEROUS ROLE -->
-                        <div class="section">
-                            <h3>⚠️ Anti-Dangerous Role</h3>
-                            <label><input type="checkbox" name="adr_enabled" {"checked" if sec["anti_dangerous_role"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="adr_action">
-                                        <option value="remove_perms" {"selected" if sec["anti_dangerous_role"]["action"]=="remove_perms" else ""}>Rimuovi Permessi</option>
-                                        <option value="kick" {"selected" if sec["anti_dangerous_role"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_dangerous_role"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="adr_w_users" value="{",".join(map(str, sec["anti_dangerous_role"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="adr_w_roles" value="{",".join(map(str, sec["anti_dangerous_role"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-CHANNEL CREATE -->
-                        <div class="section">
-                            <h3>📁 Anti-Channel Create</h3>
-                            <label><input type="checkbox" name="acc_enabled" {"checked" if sec["anti_channel_create"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="acc_action">
-                                        <option value="delete" {"selected" if sec["anti_channel_create"]["action"]=="delete" else ""}>Elimina Canale</option>
-                                        <option value="kick" {"selected" if sec["anti_channel_create"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_channel_create"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="acc_w_users" value="{",".join(map(str, sec["anti_channel_create"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="acc_w_roles" value="{",".join(map(str, sec["anti_channel_create"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-
-                        <!-- ANTI-CHANNEL DELETE -->
-                        <div class="section">
-                            <h3>❌ Anti-Channel Delete</h3>
-                            <label><input type="checkbox" name="acd_enabled" {"checked" if sec["anti_channel_delete"]["enabled"] else ""}> Abilita</label>
-                            <div class="rule-box">
-                                <label>Conseguenza:
-                                    <select name="acd_action">
-                                        <option value="kick" {"selected" if sec["anti_channel_delete"]["action"]=="kick" else ""}>Kick</option>
-                                        <option value="ban" {"selected" if sec["anti_channel_delete"]["action"]=="ban" else ""}>Ban</option>
-                                    </select>
-                                </label>
-                                <label>Whitelist ID Utenti (virgola): <input type="text" name="acd_w_users" value="{",".join(map(str, sec["anti_channel_delete"]["whitelist_users"]))}"></label>
-                                <label>Whitelist ID Ruoli (virgola): <input type="text" name="acd_w_roles" value="{",".join(map(str, sec["anti_channel_delete"]["whitelist_roles"]))}"></label>
-                            </div>
-                        </div>
-                        
-                        <!-- CANALI LOG -->
-                        <div class="section">
-                            <h3>📋 ID Canali Log per Categoria</h3>
-                            <label>Messaggi:<input type="text" name="log_messages" value="{log_c["messages"] or ""}"></label>
-                            <label>Membri:<input type="text" name="log_members" value="{log_c["members"] or ""}"></label>
-                            <label>Canali:<input type="text" name="log_channels_cat" value="{log_c["channels"] or ""}"></label>
-                            <label>Ruoli:<input type="text" name="log_roles" value="{log_c["roles"] or ""}"></label>
-                            <label>Vocali:<input type="text" name="log_voice" value="{log_c["voice"] or ""}"></label>
-                            <label>Server & Altro:<input type="text" name="log_server" value="{log_c["server"] or ""}"></label>
-                            <label>🛡️ Sicurezza:<input type="text" name="log_security" value="{log_c["security"] or ""}"></label>
-                        </div>
-                        
-                        <button type="submit">Salva e Aggiorna Impostazioni</button>
-                    </form>
+            <div class="section">
+                <h3>🔗 Anti-Link</h3>
+                <label><input type="checkbox" name="al_enabled" {% if sec.anti_link.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="al_action">
+                            <option value="delete" {% if sec.anti_link.action == "delete" %}selected{% endif %}>Solo Elimina</option>
+                            <option value="timeout" {% if sec.anti_link.action == "timeout" %}selected{% endif %}>Timeout</option>
+                            <option value="kick" {% if sec.anti_link.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_link.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Durata Timeout (Min): <input type="text" name="al_time" value="{{ sec.anti_link.timeout_minutes }}"></label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="al_w_users" value="{{ ','.join(sec.anti_link.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="al_w_roles" value="{{ ','.join(sec.anti_link.whitelist_roles|map('string')) }}"></label>
                 </div>
-            </body>
-            </html>
-            """
-            self.wfile.write(html_content.encode("utf-8"))
+            </div>
 
-    def do_POST(self):
-        if self.path == "/update":
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
+            <div class="section">
+                <h3>📨 Anti-Invite</h3>
+                <label><input type="checkbox" name="ai_enabled" {% if sec.anti_invite.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="ai_action">
+                            <option value="delete" {% if sec.anti_invite.action == "delete" %}selected{% endif %}>Solo Elimina</option>
+                            <option value="timeout" {% if sec.anti_invite.action == "timeout" %}selected{% endif %}>Timeout</option>
+                            <option value="kick" {% if sec.anti_invite.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_invite.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Durata Timeout (Min): <input type="text" name="ai_time" value="{{ sec.anti_invite.timeout_minutes }}"></label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="ai_w_users" value="{{ ','.join(sec.anti_invite.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="ai_w_roles" value="{{ ','.join(sec.anti_invite.whitelist_roles|map('string')) }}"></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>⚡ Anti-Spam</h3>
+                <label><input type="checkbox" name="as_enabled" {% if sec.anti_spam.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="as_action">
+                            <option value="delete" {% if sec.anti_spam.action == "delete" %}selected{% endif %}>Solo Elimina</option>
+                            <option value="timeout" {% if sec.anti_spam.action == "timeout" %}selected{% endif %}>Timeout</option>
+                            <option value="kick" {% if sec.anti_spam.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_spam.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Durata Timeout (Min): <input type="text" name="as_time" value="{{ sec.anti_spam.timeout_minutes }}"></label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="as_w_users" value="{{ ','.join(sec.anti_spam.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="as_w_roles" value="{{ ','.join(sec.anti_spam.whitelist_roles|map('string')) }}"></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🤖 Anti-Bot Add</h3>
+                <label><input type="checkbox" name="aba_enabled" {% if sec.anti_bot_add.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="aba_action">
+                            <option value="kick" {% if sec.anti_bot_add.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_bot_add.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Whitelist ID Utenti autorizzati (virgola): <input type="text" name="aba_w_users" value="{{ ','.join(sec.anti_bot_add.whitelist_users|map('string')) }}"></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🏷️ Anti-Role Create</h3>
+                <label><input type="checkbox" name="arc_enabled" {% if sec.anti_role_create.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="arc_action">
+                            <option value="delete" {% if sec.anti_role_create.action == "delete" %}selected{% endif %}>Elimina Ruolo</option>
+                            <option value="kick" {% if sec.anti_role_create.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_role_create.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="arc_w_users" value="{{ ','.join(sec.anti_role_create.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="arc_w_roles" value="{{ ','.join(sec.anti_role_create.whitelist_roles|map('string')) }}"></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🗑️ Anti-Role Delete</h3>
+                <label><input type="checkbox" name="ard_enabled" {% if sec.anti_role_delete.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="ard_action">
+                            <option value="kick" {% if sec.anti_role_delete.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_role_delete.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="ard_w_users" value="{{ ','.join(sec.anti_role_delete.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="ard_w_roles" value="{{ ','.join(sec.anti_role_delete.whitelist_roles|map('string')) }}"></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>⚠️ Anti-Dangerous Role</h3>
+                <label><input type="checkbox" name="adr_enabled" {% if sec.anti_dangerous_role.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="adr_action">
+                            <option value="remove_perms" {% if sec.anti_dangerous_role.action == "remove_perms" %}selected{% endif %}>Rimuovi Permessi</option>
+                            <option value="kick" {% if sec.anti_dangerous_role.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_dangerous_role.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="adr_w_users" value="{{ ','.join(sec.anti_dangerous_role.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="adr_w_roles" value="{{ ','.join(sec.anti_dangerous_role.whitelist_roles|map('string')) }}"></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📁 Anti-Channel Create</h3>
+                <label><input type="checkbox" name="acc_enabled" {% if sec.anti_channel_create.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="acc_action">
+                            <option value="delete" {% if sec.anti_channel_create.action == "delete" %}selected{% endif %}>Elimina Canale</option>
+                            <option value="kick" {% if sec.anti_channel_create.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_channel_create.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="acc_w_users" value="{{ ','.join(sec.anti_channel_create.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="acc_w_roles" value="{{ ','.join(sec.anti_channel_create.whitelist_roles|map('string')) }}"></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>❌ Anti-Channel Delete</h3>
+                <label><input type="checkbox" name="acd_enabled" {% if sec.anti_channel_delete.enabled %}checked{% endif %}> Abilita</label>
+                <div class="rule-box">
+                    <label>Conseguenza:
+                        <select name="acd_action">
+                            <option value="kick" {% if sec.anti_channel_delete.action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if sec.anti_channel_delete.action == "ban" %}selected{% endif %}>Ban</option>
+                        </select>
+                    </label>
+                    <label>Whitelist ID Utenti (virgola): <input type="text" name="acd_w_users" value="{{ ','.join(sec.anti_channel_delete.whitelist_users|map('string')) }}"></label>
+                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="acd_w_roles" value="{{ ','.join(sec.anti_channel_delete.whitelist_roles|map('string')) }}"></label>
+                </div>
+            </div>
             
-            params = {}
-            for pair in post_data.split("&"):
-                if "=" in pair:
-                    k, v = pair.split("=", 1)
-                    params[k] = requests_unquote(v)
+            <div class="section">
+                <h3>📋 Canali Log per Categoria</h3>
+                
+                <label>Messaggi:
+                    <select name="log_messages">
+                        <option value="">-- Disabilitato --</option>
+                        {% for ch in channels %}
+                            <option value="{{ ch.id }}" {% if log_c.messages == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
 
-            def parse_list(val):
-                res = []
-                for item in val.split(","):
-                    item = item.strip()
-                    if item.isdigit():
-                        res.append(int(item))
-                return res
+                <label>Membri:
+                    <select name="log_members">
+                        <option value="">-- Disabilitato --</option>
+                        {% for ch in channels %}
+                            <option value="{{ ch.id }}" {% if log_c.members == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
 
-            def parse_int(val, default):
-                try:
-                    return int(val.strip())
-                except:
-                    return default
+                <label>Canali:
+                    <select name="log_channels_cat">
+                        <option value="">-- Disabilitato --</option>
+                        {% for ch in channels %}
+                            <option value="{{ ch.id }}" {% if log_c.channels == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
 
-            sec = config_data["security"]
+                <label>Ruoli:
+                    <select name="log_roles">
+                        <option value="">-- Disabilitato --</option>
+                        {% for ch in channels %}
+                            <option value="{{ ch.id }}" {% if log_c.roles == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
 
-            sec["anti_link"]["enabled"] = "al_enabled" in params
-            sec["anti_link"]["action"] = params.get("al_action", "delete")
-            sec["anti_link"]["timeout_minutes"] = parse_int(params.get("al_time", "1"), 1)
-            sec["anti_link"]["whitelist_users"] = parse_list(params.get("al_w_users", ""))
-            sec["anti_link"]["whitelist_roles"] = parse_list(params.get("al_w_roles", ""))
+                <label>Vocali:
+                    <select name="log_voice">
+                        <option value="">-- Disabilitato --</option>
+                        {% for ch in channels %}
+                            <option value="{{ ch.id }}" {% if log_c.voice == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
 
-            sec["anti_invite"]["enabled"] = "ai_enabled" in params
-            sec["anti_invite"]["action"] = params.get("ai_action", "timeout")
-            sec["anti_invite"]["timeout_minutes"] = parse_int(params.get("ai_time", "5"), 5)
-            sec["anti_invite"]["whitelist_users"] = parse_list(params.get("ai_w_users", ""))
-            sec["anti_invite"]["whitelist_roles"] = parse_list(params.get("ai_w_roles", ""))
+                <label>Server & Altro:
+                    <select name="log_server">
+                        <option value="">-- Disabilitato --</option>
+                        {% for ch in channels %}
+                            <option value="{{ ch.id }}" {% if log_c.server == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
 
-            sec["anti_spam"]["enabled"] = "as_enabled" in params
-            sec["anti_spam"]["action"] = params.get("as_action", "timeout")
-            sec["anti_spam"]["timeout_minutes"] = parse_int(params.get("as_time", "1"), 1)
-            sec["anti_spam"]["whitelist_users"] = parse_list(params.get("as_w_users", ""))
-            sec["anti_spam"]["whitelist_roles"] = parse_list(params.get("as_w_roles", ""))
-
-            sec["anti_bot_add"]["enabled"] = "aba_enabled" in params
-            sec["anti_bot_add"]["action"] = params.get("aba_action", "kick")
-            sec["anti_bot_add"]["whitelist_users"] = parse_list(params.get("aba_w_users", ""))
-
-            sec["anti_role_create"]["enabled"] = "arc_enabled" in params
-            sec["anti_role_create"]["action"] = params.get("arc_action", "delete")
-            sec["anti_role_create"]["whitelist_users"] = parse_list(params.get("arc_w_users", ""))
-            sec["anti_role_create"]["whitelist_roles"] = parse_list(params.get("arc_w_roles", ""))
-
-            sec["anti_role_delete"]["enabled"] = "ard_enabled" in params
-            sec["anti_role_delete"]["action"] = params.get("ard_action", "kick")
-            sec["anti_role_delete"]["whitelist_users"] = parse_list(params.get("ard_w_users", ""))
-            sec["anti_role_delete"]["whitelist_roles"] = parse_list(params.get("ard_w_roles", ""))
-
-            sec["anti_dangerous_role"]["enabled"] = "adr_enabled" in params
-            sec["anti_dangerous_role"]["action"] = params.get("adr_action", "remove_perms")
-            sec["anti_dangerous_role"]["whitelist_users"] = parse_list(params.get("adr_w_users", ""))
-            sec["anti_dangerous_role"]["whitelist_roles"] = parse_list(params.get("adr_w_roles", ""))
-
-            sec["anti_channel_create"]["enabled"] = "acc_enabled" in params
-            sec["anti_channel_create"]["action"] = params.get("acc_action", "delete")
-            sec["anti_channel_create"]["whitelist_users"] = parse_list(params.get("acc_w_users", ""))
-            sec["anti_channel_create"]["whitelist_roles"] = parse_list(params.get("acc_w_roles", ""))
-
-            sec["anti_channel_delete"]["enabled"] = "acd_enabled" in params
-            sec["anti_channel_delete"]["action"] = params.get("acd_action", "kick")
-            sec["anti_channel_delete"]["whitelist_users"] = parse_list(params.get("acd_w_users", ""))
-            sec["anti_channel_delete"]["whitelist_roles"] = parse_list(params.get("acd_w_roles", ""))
-
-            def parse_id(val):
-                try:
-                    return int(val.strip()) if val.strip() != "" else None
-                except:
-                    return None
-
-            config_data["log_channels"]["messages"] = parse_id(params.get("log_messages", ""))
-            config_data["log_channels"]["members"] = parse_id(params.get("log_members", ""))
-            config_data["log_channels"]["channels"] = parse_id(params.get("log_channels_cat", ""))
-            config_data["log_channels"]["roles"] = parse_id(params.get("log_roles", ""))
-            config_data["log_channels"]["voice"] = parse_id(params.get("log_voice", ""))
-            config_data["log_channels"]["server"] = parse_id(params.get("log_server", ""))
-            config_data["log_channels"]["security"] = parse_id(params.get("log_security", ""))
+                <label>🛡️ Sicurezza:
+                    <select name="log_security">
+                        <option value="">-- Disabilitato --</option>
+                        {% for ch in channels %}
+                            <option value="{{ ch.id }}" {% if log_c.security == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
             
-            asyncio_run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
+            <button type="submit">Salva e Aggiorna Impostazioni</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
 
-            self.send_response(303)
-            self.send_header('Location', '/')
-            self.end_headers()
+@app.route("/")
+def dashboard_index():
+    class SafeAccess(dict):
+        def __getattr__(self, item):
+            val = self.get(item)
+            return SafeAccess(val) if isinstance(val, dict) else val
 
-def requests_unquote(string):
-    import urllib.parse
-    return urllib.parse.unquote_plus(string)
+    sec_safe = SafeAccess(config_data["security"])
+    log_safe = SafeAccess(config_data["log_channels"])
+    
+    # Raccoglie la lista di tutti i canali testuali da tutti i server in cui si trova il bot
+    all_channels = []
+    for guild in bot.guilds:
+        for ch in guild.text_channels:
+            all_channels.append({"id": ch.id, "name": f"{guild.name} / #{ch.name}"})
+
+    return render_template_string(DASHBOARD_HTML, sec=sec_safe, log_c=log_safe, channels=all_channels)
+
+@app.route("/update", methods=["POST"])
+def dashboard_update():
+    def parse_list(val):
+        res = []
+        for item in val.split(","):
+            item = item.strip()
+            if item.isdigit():
+                res.append(int(item))
+        return res
+
+    def parse_int(val, default):
+        try:
+            return int(val.strip())
+        except:
+            return default
+
+    sec = config_data["security"]
+
+    sec["anti_link"]["enabled"] = "al_enabled" in request.form
+    sec["anti_link"]["action"] = request.form.get("al_action", "delete")
+    sec["anti_link"]["timeout_minutes"] = parse_int(request.form.get("al_time", "1"), 1)
+    sec["anti_link"]["whitelist_users"] = parse_list(request.form.get("al_w_users", ""))
+    sec["anti_link"]["whitelist_roles"] = parse_list(request.form.get("al_w_roles", ""))
+
+    sec["anti_invite"]["enabled"] = "ai_enabled" in request.form
+    sec["anti_invite"]["action"] = request.form.get("ai_action", "timeout")
+    sec["anti_invite"]["timeout_minutes"] = parse_int(request.form.get("ai_time", "5"), 5)
+    sec["anti_invite"]["whitelist_users"] = parse_list(request.form.get("ai_w_users", ""))
+    sec["anti_invite"]["whitelist_roles"] = parse_list(request.form.get("ai_w_roles", ""))
+
+    sec["anti_spam"]["enabled"] = "as_enabled" in request.form
+    sec["anti_spam"]["action"] = request.form.get("as_action", "timeout")
+    sec["anti_spam"]["timeout_minutes"] = parse_int(request.form.get("as_time", "1"), 1)
+    sec["anti_spam"]["whitelist_users"] = parse_list(request.form.get("as_w_users", ""))
+    sec["anti_spam"]["whitelist_roles"] = parse_list(request.form.get("as_w_roles", ""))
+
+    sec["anti_bot_add"]["enabled"] = "aba_enabled" in request.form
+    sec["anti_bot_add"]["action"] = request.form.get("aba_action", "kick")
+    sec["anti_bot_add"]["whitelist_users"] = parse_list(request.form.get("aba_w_users", ""))
+
+    sec["anti_role_create"]["enabled"] = "arc_enabled" in request.form
+    sec["anti_role_create"]["action"] = request.form.get("arc_action", "delete")
+    sec["anti_role_create"]["whitelist_users"] = parse_list(request.form.get("arc_w_users", ""))
+    sec["anti_role_create"]["whitelist_roles"] = parse_list(request.form.get("arc_w_roles", ""))
+
+    sec["anti_role_delete"]["enabled"] = "ard_enabled" in request.form
+    sec["anti_role_delete"]["action"] = request.form.get("ard_action", "kick")
+    sec["anti_role_delete"]["whitelist_users"] = parse_list(request.form.get("ard_w_users", ""))
+    sec["anti_role_delete"]["whitelist_roles"] = parse_list(request.form.get("ard_w_roles", ""))
+
+    sec["anti_dangerous_role"]["enabled"] = "adr_enabled" in request.form
+    sec["anti_dangerous_role"]["action"] = request.form.get("adr_action", "remove_perms")
+    sec["anti_dangerous_role"]["whitelist_users"] = parse_list(request.form.get("adr_w_users", ""))
+    sec["anti_dangerous_role"]["whitelist_roles"] = parse_list(request.form.get("adr_w_roles", ""))
+
+    sec["anti_channel_create"]["enabled"] = "acc_enabled" in request.form
+    sec["anti_channel_create"]["action"] = request.form.get("acc_action", "delete")
+    sec["anti_channel_create"]["whitelist_users"] = parse_list(request.form.get("acc_w_users", ""))
+    sec["anti_channel_create"]["whitelist_roles"] = parse_list(request.form.get("acc_w_roles", ""))
+
+    sec["anti_channel_delete"]["enabled"] = "acd_enabled" in request.form
+    sec["anti_channel_delete"]["action"] = request.form.get("acd_action", "kick")
+    sec["anti_channel_delete"]["whitelist_users"] = parse_list(request.form.get("acd_w_users", ""))
+    sec["anti_channel_delete"]["whitelist_roles"] = parse_list(request.form.get("acd_w_roles", ""))
+
+    def parse_id(val):
+        try:
+            return int(val.strip()) if val.strip() != "" else None
+        except:
+            return None
+
+    config_data["log_channels"]["messages"] = parse_id(request.form.get("log_messages", ""))
+    config_data["log_channels"]["members"] = parse_id(request.form.get("log_members", ""))
+    config_data["log_channels"]["channels"] = parse_id(request.form.get("log_channels_cat", ""))
+    config_data["log_channels"]["roles"] = parse_id(request.form.get("log_roles", ""))
+    config_data["log_channels"]["voice"] = parse_id(request.form.get("log_voice", ""))
+    config_data["log_channels"]["server"] = parse_id(request.form.get("log_server", ""))
+    config_data["log_channels"]["security"] = parse_id(request.form.get("log_security", ""))
+    
+    discord.utils.run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
+
+    return redirect(url_for('dashboard_index'))
 
 def run_web_dashboard():
-    server_address = ('0.0.0.0', 8080)
-    httpd = HTTPServer(server_address, DashboardHandler)
-    print("🌐 Dashboard Web avviata sulla porta 8080")
-    httpd.serve_forever()
-
-def asyncio_run_coroutine_threadsafe(coro, loop):
-    future = discord.utils.run_coroutine_threadsafe(coro, loop)
-    return future
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
 
 
 # ==========================================
