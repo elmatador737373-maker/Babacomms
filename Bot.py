@@ -248,8 +248,6 @@ async def on_member_remove(member):
 async def panel(ctx):
     file = discord.File("pannello.png", filename="pannello.png")
     
-     file = discord.File("pannello.png", filename="pannello.png")
-    
     embed = discord.Embed(
         title="<:MadisonStateUnban:1494380677389488237> • MADISON PANELLO SBAN",
         description=(
