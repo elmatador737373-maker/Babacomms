@@ -5,9 +5,6 @@ import json
 import io
 import time
 from collections import defaultdict
-from flask import Flask, render_template_string, request, redirect, url_for
-import threading
-import logging
 
 # ==========================================
 # ⚙️ CONFIGURAZIONE INIZIALE
@@ -104,14 +101,14 @@ spam_tracker = defaultdict(list)
 
 
 # ==========================================
-# ☁️ GESTIONE CONFIGURAZIONI NEL CLOUD (SERVER SECONDARIO)
+# ☁️ GESTIONE CONFIGURAZIONI NEL CLOUD
 # ==========================================
 
 async def load_config_from_discord():
     global config_data
     channel = bot.get_channel(CLOUD_JSON_CHANNEL_ID)
     if not channel:
-        print("[AVVISO] Canale Cloud JSON (sul server secondario) non trovato. Uso i valori predefiniti.")
+        print("[AVVISO] Canale Cloud JSON (sul server secondario) non trovato.")
         return
     
     try:
@@ -130,7 +127,7 @@ async def load_config_from_discord():
                         print("⚙️ Configurazioni caricate con successo dal server secondario.")
                         return
     except Exception as e:
-        print(f"[ERRORE CARICAMENTO CONFIG DA ALTRO SERVER]: {e}")
+        print(f"[ERRORE CARICAMENTO CONFIG]: {e}")
 
 async def save_config_to_discord():
     channel = bot.get_channel(CLOUD_JSON_CHANNEL_ID)
@@ -152,10 +149,10 @@ async def save_config_to_discord():
         pass
 
     try:
-        await channel.send("⚙️ **Aggiornamento Configurazioni Bot & Log (Server Secondario):**", file=discord_file)
+        await channel.send("⚙️ **Aggiornamento Configurazioni Bot & Log:**", file=discord_file)
         print("⚙️ Configurazioni salvate con successo sul server secondario.")
     except Exception as e:
-        print(f"[ERRORE SALVATAGGIO CONFIG SU ALTRO SERVER]: {e}")
+        print(f"[ERRORE SALVATAGGIO CONFIG]: {e}")
 
 
 @bot.event
@@ -170,7 +167,7 @@ async def on_ready():
 
 
 # ==========================================
-# 🎨 FUNZIONE DI INVIO LOG SPECIFICO
+# 🎨 INVIO LOG SPECIFICO
 # ==========================================
 
 async def send_typed_log(guild: discord.Guild, log_type: str, embed: discord.Embed):
@@ -187,360 +184,130 @@ async def send_typed_log(guild: discord.Guild, log_type: str, embed: discord.Emb
 
 
 # ==========================================
-# 🌐 FLASK WEB DASHBOARD (CON NOMI CANALI)
+# 🔒 CONTROLLO PRIVILEGI PROPRIETARIO
 # ==========================================
 
-app = Flask(__name__)
+async def is_owner_or_guild_owner(interaction: discord.Interaction) -> bool:
+    if not interaction.guild:
+        return False
+    is_bot_owner = await bot.is_owner(interaction.user)
+    is_server_owner = interaction.user.id == interaction.guild.owner_id
+    return is_bot_owner or is_server_owner
 
-DASHBOARD_HTML = """
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>Bot Security & Logs Dashboard</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 40px; }
-        .container { max-width: 950px; margin: auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        h1 { color: #38bdf8; text-align: center; margin-bottom: 30px; }
-        .section { margin-bottom: 25px; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid #334155; }
-        h3 { margin-top: 0; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 8px; }
-        label { display: block; margin: 10px 0; font-size: 14px; cursor: pointer; }
-        input[type="text"], select { width: 100%; padding: 10px; margin-top: 5px; background: #1e293b; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }
-        button { background: #0284c7; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.2s; }
-        button:hover { background: #0369a1; }
-        .rule-box { background: #1e293b; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #475569; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🛡️ Gestione Bot Security & Logs</h1>
-        <form method="POST" action="/update">
+
+# ==========================================
+# 🎛️ PANNELLO DI SETTING (COMANDI DISCORD)
+# ==========================================
+
+class SettingsView(discord.ui.View):
+    def __init__(self, inter: discord.Interaction):
+        super().__init__(timeout=180)
+        self.inter = inter
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        allowed = await is_owner_or_guild_owner(interaction)
+        if not allowed:
+            await interaction.response.send_message("❌ Solo il proprietario del bot o il proprietario del server possono usare questi pulsanti.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Stato Sicurezza", style=discord.ButtonStyle.primary, emoji="🛡️")
+    async def security_status(self, interaction: discord.Interaction, button: discord.ui.Button):
+        sec = config_data["security"]
+        desc = ""
+        for k, v in sec.items():
+            status = "✅ Abilitato" if v.get("enabled") else "❌ Disabilitato"
+            desc += f"**{k.replace('_', ' ').title()}**: {status}\n"
+        
+        embed = discord.Embed(title="🛡️ Stato Moduli di Sicurezza", description=desc, color=discord.Color.blue())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Global Whitelist", style=discord.ButtonStyle.success, emoji="🌐")
+    async def global_whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = GlobalWhitelistModal()
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Canali Log", style=discord.ButtonStyle.secondary, emoji="📋")
+    async def log_channels_view(self, interaction: discord.Interaction, button: discord.ui.Button):
+        logs = config_data["log_channels"]
+        desc = ""
+        for k, v in logs.items():
+            ch_mention = f"<#{v}>" if v else "Non impostato"
+            desc += f"**{k.title()}**: {ch_mention}\n"
             
-            <div class="section">
-                <h3>🔗 Anti-Link</h3>
-                <label><input type="checkbox" name="al_enabled" {% if sec.anti_link.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="al_action">
-                            <option value="delete" {% if sec.anti_link.action == "delete" %}selected{% endif %}>Solo Elimina</option>
-                            <option value="timeout" {% if sec.anti_link.action == "timeout" %}selected{% endif %}>Timeout</option>
-                            <option value="kick" {% if sec.anti_link.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_link.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Durata Timeout (Min): <input type="text" name="al_time" value="{{ sec.anti_link.timeout_minutes }}"></label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="al_w_users" value="{{ ','.join(sec.anti_link.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="al_w_roles" value="{{ ','.join(sec.anti_link.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
+        embed = discord.Embed(title="📋 Configurazione Canali Log", description=desc, color=discord.Color.gold())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-            <div class="section">
-                <h3>📨 Anti-Invite</h3>
-                <label><input type="checkbox" name="ai_enabled" {% if sec.anti_invite.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="ai_action">
-                            <option value="delete" {% if sec.anti_invite.action == "delete" %}selected{% endif %}>Solo Elimina</option>
-                            <option value="timeout" {% if sec.anti_invite.action == "timeout" %}selected{% endif %}>Timeout</option>
-                            <option value="kick" {% if sec.anti_invite.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_invite.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Durata Timeout (Min): <input type="text" name="ai_time" value="{{ sec.anti_invite.timeout_minutes }}"></label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="ai_w_users" value="{{ ','.join(sec.anti_invite.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="ai_w_roles" value="{{ ','.join(sec.anti_invite.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
 
-            <div class="section">
-                <h3>⚡ Anti-Spam</h3>
-                <label><input type="checkbox" name="as_enabled" {% if sec.anti_spam.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="as_action">
-                            <option value="delete" {% if sec.anti_spam.action == "delete" %}selected{% endif %}>Solo Elimina</option>
-                            <option value="timeout" {% if sec.anti_spam.action == "timeout" %}selected{% endif %}>Timeout</option>
-                            <option value="kick" {% if sec.anti_spam.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_spam.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Durata Timeout (Min): <input type="text" name="as_time" value="{{ sec.anti_spam.timeout_minutes }}"></label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="as_w_users" value="{{ ','.join(sec.anti_spam.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="as_w_roles" value="{{ ','.join(sec.anti_spam.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
+class GlobalWhitelistModal(discord.ui.Modal, title="Gestione Global Whitelist"):
+    target_id = discord.ui.TextInput(
+        label="ID Utente o Ruolo da Whitelistare",
+        placeholder="Inserisci l'ID numerico esatto...",
+        required=True,
+        max_length=25
+    )
+    action_type = discord.ui.TextInput(
+        label="Azione (aggiungi / rimuovi)",
+        placeholder="Scrivi 'aggiungi' o 'rimuovi'",
+        required=True,
+        max_length=10
+    )
 
-            <div class="section">
-                <h3>🤖 Anti-Bot Add</h3>
-                <label><input type="checkbox" name="aba_enabled" {% if sec.anti_bot_add.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="aba_action">
-                            <option value="kick" {% if sec.anti_bot_add.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_bot_add.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Whitelist ID Utenti autorizzati (virgola): <input type="text" name="aba_w_users" value="{{ ','.join(sec.anti_bot_add.whitelist_users|map('string')) }}"></label>
-                </div>
-            </div>
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
 
-            <div class="section">
-                <h3>🏷️ Anti-Role Create</h3>
-                <label><input type="checkbox" name="arc_enabled" {% if sec.anti_role_create.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="arc_action">
-                            <option value="delete" {% if sec.anti_role_create.action == "delete" %}selected{% endif %}>Elimina Ruolo</option>
-                            <option value="kick" {% if sec.anti_role_create.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_role_create.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="arc_w_users" value="{{ ','.join(sec.anti_role_create.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="arc_w_roles" value="{{ ','.join(sec.anti_role_create.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
-
-            <div class="section">
-                <h3>🗑️ Anti-Role Delete</h3>
-                <label><input type="checkbox" name="ard_enabled" {% if sec.anti_role_delete.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="ard_action">
-                            <option value="kick" {% if sec.anti_role_delete.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_role_delete.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="ard_w_users" value="{{ ','.join(sec.anti_role_delete.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="ard_w_roles" value="{{ ','.join(sec.anti_role_delete.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
-
-            <div class="section">
-                <h3>⚠️ Anti-Dangerous Role</h3>
-                <label><input type="checkbox" name="adr_enabled" {% if sec.anti_dangerous_role.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="adr_action">
-                            <option value="remove_perms" {% if sec.anti_dangerous_role.action == "remove_perms" %}selected{% endif %}>Rimuovi Permessi</option>
-                            <option value="kick" {% if sec.anti_dangerous_role.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_dangerous_role.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="adr_w_users" value="{{ ','.join(sec.anti_dangerous_role.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="adr_w_roles" value="{{ ','.join(sec.anti_dangerous_role.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
-
-            <div class="section">
-                <h3>📁 Anti-Channel Create</h3>
-                <label><input type="checkbox" name="acc_enabled" {% if sec.anti_channel_create.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="acc_action">
-                            <option value="delete" {% if sec.anti_channel_create.action == "delete" %}selected{% endif %}>Elimina Canale</option>
-                            <option value="kick" {% if sec.anti_channel_create.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_channel_create.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="acc_w_users" value="{{ ','.join(sec.anti_channel_create.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="acc_w_roles" value="{{ ','.join(sec.anti_channel_create.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
-
-            <div class="section">
-                <h3>❌ Anti-Channel Delete</h3>
-                <label><input type="checkbox" name="acd_enabled" {% if sec.anti_channel_delete.enabled %}checked{% endif %}> Abilita</label>
-                <div class="rule-box">
-                    <label>Conseguenza:
-                        <select name="acd_action">
-                            <option value="kick" {% if sec.anti_channel_delete.action == "kick" %}selected{% endif %}>Kick</option>
-                            <option value="ban" {% if sec.anti_channel_delete.action == "ban" %}selected{% endif %}>Ban</option>
-                        </select>
-                    </label>
-                    <label>Whitelist ID Utenti (virgola): <input type="text" name="acd_w_users" value="{{ ','.join(sec.anti_channel_delete.whitelist_users|map('string')) }}"></label>
-                    <label>Whitelist ID Ruoli (virgola): <input type="text" name="acd_w_roles" value="{{ ','.join(sec.anti_channel_delete.whitelist_roles|map('string')) }}"></label>
-                </div>
-            </div>
-            
-            <div class="section">
-                <h3>📋 Canali Log per Categoria</h3>
-                
-                <label>Messaggi:
-                    <select name="log_messages">
-                        <option value="">-- Disabilitato --</option>
-                        {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% if log_c.messages == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-
-                <label>Membri:
-                    <select name="log_members">
-                        <option value="">-- Disabilitato --</option>
-                        {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% if log_c.members == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-
-                <label>Canali:
-                    <select name="log_channels_cat">
-                        <option value="">-- Disabilitato --</option>
-                        {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% if log_c.channels == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-
-                <label>Ruoli:
-                    <select name="log_roles">
-                        <option value="">-- Disabilitato --</option>
-                        {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% if log_c.roles == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-
-                <label>Vocali:
-                    <select name="log_voice">
-                        <option value="">-- Disabilitato --</option>
-                        {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% if log_c.voice == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-
-                <label>Server & Altro:
-                    <select name="log_server">
-                        <option value="">-- Disabilitato --</option>
-                        {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% if log_c.server == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-
-                <label>🛡️ Sicurezza:
-                    <select name="log_security">
-                        <option value="">-- Disabilitato --</option>
-                        {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% if log_c.security == ch.id %}selected{% endif %}>#{{ ch.name }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-            </div>
-            
-            <button type="submit">Salva e Aggiorna Impostazioni</button>
-        </form>
-    </div>
-</body>
-</html>
-"""
-
-@app.route("/")
-def dashboard_index():
-    class SafeAccess(dict):
-        def __getattr__(self, item):
-            val = self.get(item)
-            return SafeAccess(val) if isinstance(val, dict) else val
-
-    sec_safe = SafeAccess(config_data["security"])
-    log_safe = SafeAccess(config_data["log_channels"])
-    
-    # Raccoglie la lista di tutti i canali testuali da tutti i server in cui si trova il bot
-    all_channels = []
-    for guild in bot.guilds:
-        for ch in guild.text_channels:
-            all_channels.append({"id": ch.id, "name": f"{guild.name} / #{ch.name}"})
-
-    return render_template_string(DASHBOARD_HTML, sec=sec_safe, log_c=log_safe, channels=all_channels)
-
-@app.route("/update", methods=["POST"])
-def dashboard_update():
-    def parse_list(val):
-        res = []
-        for item in val.split(","):
-            item = item.strip()
-            if item.isdigit():
-                res.append(int(item))
-        return res
-
-    def parse_int(val, default):
         try:
-            return int(val.strip())
-        except:
-            return default
+            target_val = int(self.target_id.value.strip())
+        except ValueError:
+            return await interaction.response.send_message("❌ L'ID inserito non è valido.", ephemeral=True)
+        
+        action = self.action_type.value.strip().lower()
+        if action not in ["aggiungi", "rimuovi"]:
+            return await interaction.response.send_message("❌ Azione non valida. Scrivi 'aggiungi' o 'rimuovi'.", ephemeral=True)
 
-    sec = config_data["security"]
+        is_role = interaction.guild.get_role(target_val) is not None
+        
+        updated_count = 0
+        for module_name, module_config in config_data["security"].items():
+            if is_role:
+                lst = module_config.setdefault("whitelist_roles", [])
+                if action == "aggiungi" and target_val not in lst:
+                    lst.append(target_val)
+                    updated_count += 1
+                elif action == "rimuovi" and target_val in lst:
+                    lst.remove(target_val)
+                    updated_count += 1
+            else:
+                lst = module_config.setdefault("whitelist_users", [])
+                if action == "aggiungi" and target_val not in lst:
+                    lst.append(target_val)
+                    updated_count += 1
+                elif action == "rimuovi" and target_val in lst:
+                    lst.remove(target_val)
+                    updated_count += 1
 
-    sec["anti_link"]["enabled"] = "al_enabled" in request.form
-    sec["anti_link"]["action"] = request.form.get("al_action", "delete")
-    sec["anti_link"]["timeout_minutes"] = parse_int(request.form.get("al_time", "1"), 1)
-    sec["anti_link"]["whitelist_users"] = parse_list(request.form.get("al_w_users", ""))
-    sec["anti_link"]["whitelist_roles"] = parse_list(request.form.get("al_w_roles", ""))
+        discord.utils.run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
+        
+        tipo_str = "Ruolo" if is_role else "Utente"
+        await interaction.response.send_message(
+            f"✅ Operazione completata! {tipo_str} (`{target_val}`) {'aggiunto a ' + str(updated_count) + ' moduli' if action == 'aggiungi' else 'rimosso da tutti i moduli'}.",
+            ephemeral=True
+        )
 
-    sec["anti_invite"]["enabled"] = "ai_enabled" in request.form
-    sec["anti_invite"]["action"] = request.form.get("ai_action", "timeout")
-    sec["anti_invite"]["timeout_minutes"] = parse_int(request.form.get("ai_time", "5"), 5)
-    sec["anti_invite"]["whitelist_users"] = parse_list(request.form.get("ai_w_users", ""))
-    sec["anti_invite"]["whitelist_roles"] = parse_list(request.form.get("ai_w_roles", ""))
 
-    sec["anti_spam"]["enabled"] = "as_enabled" in request.form
-    sec["anti_spam"]["action"] = request.form.get("as_action", "timeout")
-    sec["anti_spam"]["timeout_minutes"] = parse_int(request.form.get("as_time", "1"), 1)
-    sec["anti_spam"]["whitelist_users"] = parse_list(request.form.get("as_w_users", ""))
-    sec["anti_spam"]["whitelist_roles"] = parse_list(request.form.get("as_w_roles", ""))
-
-    sec["anti_bot_add"]["enabled"] = "aba_enabled" in request.form
-    sec["anti_bot_add"]["action"] = request.form.get("aba_action", "kick")
-    sec["anti_bot_add"]["whitelist_users"] = parse_list(request.form.get("aba_w_users", ""))
-
-    sec["anti_role_create"]["enabled"] = "arc_enabled" in request.form
-    sec["anti_role_create"]["action"] = request.form.get("arc_action", "delete")
-    sec["anti_role_create"]["whitelist_users"] = parse_list(request.form.get("arc_w_users", ""))
-    sec["anti_role_create"]["whitelist_roles"] = parse_list(request.form.get("arc_w_roles", ""))
-
-    sec["anti_role_delete"]["enabled"] = "ard_enabled" in request.form
-    sec["anti_role_delete"]["action"] = request.form.get("ard_action", "kick")
-    sec["anti_role_delete"]["whitelist_users"] = parse_list(request.form.get("ard_w_users", ""))
-    sec["anti_role_delete"]["whitelist_roles"] = parse_list(request.form.get("ard_w_roles", ""))
-
-    sec["anti_dangerous_role"]["enabled"] = "adr_enabled" in request.form
-    sec["anti_dangerous_role"]["action"] = request.form.get("adr_action", "remove_perms")
-    sec["anti_dangerous_role"]["whitelist_users"] = parse_list(request.form.get("adr_w_users", ""))
-    sec["anti_dangerous_role"]["whitelist_roles"] = parse_list(request.form.get("adr_w_roles", ""))
-
-    sec["anti_channel_create"]["enabled"] = "acc_enabled" in request.form
-    sec["anti_channel_create"]["action"] = request.form.get("acc_action", "delete")
-    sec["anti_channel_create"]["whitelist_users"] = parse_list(request.form.get("acc_w_users", ""))
-    sec["anti_channel_create"]["whitelist_roles"] = parse_list(request.form.get("acc_w_roles", ""))
-
-    sec["anti_channel_delete"]["enabled"] = "acd_enabled" in request.form
-    sec["anti_channel_delete"]["action"] = request.form.get("acd_action", "kick")
-    sec["anti_channel_delete"]["whitelist_users"] = parse_list(request.form.get("acd_w_users", ""))
-    sec["anti_channel_delete"]["whitelist_roles"] = parse_list(request.form.get("acd_w_roles", ""))
-
-    def parse_id(val):
-        try:
-            return int(val.strip()) if val.strip() != "" else None
-        except:
-            return None
-
-    config_data["log_channels"]["messages"] = parse_id(request.form.get("log_messages", ""))
-    config_data["log_channels"]["members"] = parse_id(request.form.get("log_members", ""))
-    config_data["log_channels"]["channels"] = parse_id(request.form.get("log_channels_cat", ""))
-    config_data["log_channels"]["roles"] = parse_id(request.form.get("log_roles", ""))
-    config_data["log_channels"]["voice"] = parse_id(request.form.get("log_voice", ""))
-    config_data["log_channels"]["server"] = parse_id(request.form.get("log_server", ""))
-    config_data["log_channels"]["security"] = parse_id(request.form.get("log_security", ""))
+@bot.tree.command(name="settings", description="Apre il pannello di controllo completo del bot")
+async def settings_command(interaction: discord.Interaction):
+    if not await is_owner_or_guild_owner(interaction):
+        return await interaction.response.send_message("❌ Questo comando può essere eseguito solo dal proprietario del bot o dal proprietario del server.", ephemeral=True)
     
-    discord.utils.run_coroutine_threadsafe(save_config_to_discord(), bot.loop)
-
-    return redirect(url_for('dashboard_index'))
-
-def run_web_dashboard():
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)
-    app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
+    embed = discord.Embed(
+        title="🎛️ Pannello di Controllo - Security & Logs",
+        description="Usa i pulsanti sottostanti per visualizzare lo stato della sicurezza, gestire la **Global Whitelist** su tutti i moduli o controllare i canali di log.",
+        color=discord.Color.blurple()
+    )
+    view = SettingsView(interaction)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 # ==========================================
@@ -687,6 +454,7 @@ async def on_member_join(member: discord.Member):
             except:
                 pass
 
+            # Se l'utente che ha aggiunto il bot NON è whitelistato, applica le restrizioni e invia il log
             if adder and not (adder.guild_permissions.administrator or adder.id in sec["whitelist_users"]):
                 action = sec.get("action", "kick")
                 action_desc = await apply_generic_action(guild, adder, action, "Aggiunta bot non autorizzata")
@@ -700,6 +468,9 @@ async def on_member_join(member: discord.Member):
                 embed.add_field(name="Aggiunto da", value=f"{adder.mention} (`{adder.id}`)", inline=False)
                 embed.add_field(name="Conseguenza", value=action_desc, inline=False)
                 await send_typed_log(guild, "security", embed)
+                return
+            else:
+                # Se è whitelistato, esce senza loggare nulla sulla sicurezza
                 return
 
     embed = discord.Embed(title="📥 Nuovo Utente Entrato", color=discord.Color.green(), timestamp=discord.utils.utcnow())
@@ -779,12 +550,7 @@ async def on_guild_role_create(role: discord.Role):
 async def on_guild_role_delete(role: discord.Role):
     guild = role.guild
     sec = config_data["security"]["anti_role_delete"]
-    if not sec["enabled"]:
-        embed = discord.Embed(title="🗑️ Ruolo Eliminato", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Nome", value=role.name, inline=True)
-        await send_typed_log(guild, "roles", embed)
-        return
-
+    
     deleter = None
     try:
         async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.role_delete):
@@ -794,7 +560,7 @@ async def on_guild_role_delete(role: discord.Role):
     except:
         pass
 
-    if deleter and not is_whitelisted(deleter, sec):
+    if sec["enabled"] and deleter and not is_whitelisted(deleter, sec):
         action = sec.get("action", "kick")
         action_desc = await apply_generic_action(guild, deleter, action, "Eliminazione ruolo non autorizzata")
 
@@ -805,6 +571,7 @@ async def on_guild_role_delete(role: discord.Role):
         await send_typed_log(guild, "security", embed)
         return
 
+    # Se è whitelistato o il modulo è disattivato, invia solo il log normale dei ruoli
     embed = discord.Embed(title="🗑️ Ruolo Eliminato", color=discord.Color.red(), timestamp=discord.utils.utcnow())
     embed.add_field(name="Nome", value=role.name, inline=True)
     await send_typed_log(guild, "roles", embed)
@@ -817,12 +584,7 @@ async def on_guild_role_delete(role: discord.Role):
 async def on_guild_channel_create(channel: discord.abc.GuildChannel):
     guild = channel.guild
     sec = config_data["security"]["anti_channel_create"]
-    if not sec["enabled"]:
-        embed = discord.Embed(title="📁 Canale Creato", color=discord.Color.green(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Nome", value=channel.name, inline=True)
-        await send_typed_log(guild, "channels", embed)
-        return
-
+    
     creator = None
     try:
         async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.channel_create):
@@ -832,7 +594,7 @@ async def on_guild_channel_create(channel: discord.abc.GuildChannel):
     except:
         pass
 
-    if creator and not is_whitelisted(creator, sec):
+    if sec["enabled"] and creator and not is_whitelisted(creator, sec):
         action = sec.get("action", "delete")
         action_desc = "Canale eliminato"
         try:
@@ -863,12 +625,7 @@ async def on_guild_channel_create(channel: discord.abc.GuildChannel):
 async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
     guild = channel.guild
     sec = config_data["security"]["anti_channel_delete"]
-    if not sec["enabled"]:
-        embed = discord.Embed(title="❌ Canale Eliminato", color=discord.Color.red(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Nome", value=channel.name, inline=True)
-        await send_typed_log(guild, "channels", embed)
-        return
-
+    
     deleter = None
     try:
         async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.channel_delete):
@@ -878,7 +635,7 @@ async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
     except:
         pass
 
-    if deleter and not is_whitelisted(deleter, sec):
+    if sec["enabled"] and deleter and not is_whitelisted(deleter, sec):
         action = sec.get("action", "kick")
         action_desc = await apply_generic_action(guild, deleter, action, "Eliminazione canale non autorizzata")
 
@@ -965,6 +722,4 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
 
 
 if __name__ == "__main__":
-    web_thread = threading.Thread(target=run_web_dashboard, daemon=True)
-    web_thread.start()
     bot.run(TOKEN)
