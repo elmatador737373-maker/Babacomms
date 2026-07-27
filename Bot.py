@@ -17,6 +17,7 @@ def run_flask():
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.members = True # Necessario per rilevare gli ingressi e le uscite dei membri
 
 # ID delle categorie o dei ruoli (Modifica con i tuoi dati)
 SUPPORT_ROLE_ID = 1352284377698144336  # ID del ruolo Staff
