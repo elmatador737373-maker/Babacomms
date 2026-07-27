@@ -145,8 +145,11 @@ async def on_ready():
     print(f"Bot online come {bot.user} (ID: {bot.user.id})")
     await load_config_from_supabase()
     try:
-        synced = await bot.tree.sync()
-        print(f"Comandi Slash sincronizzati: {len(synced)}")
+        # Sincronizzazione istantanea per il tuo server specifico
+        guild_id = discord.Object(id=1531305565496672266) 
+        bot.tree.copy_global_to(guild=guild_id)
+        synced = await bot.tree.sync(guild=guild_id)
+        print(f"Comandi Slash sincronizzati sul server: {len(synced)}")
     except Exception as e:
         print(f"Errore nella sincronizzazione dei comandi: {e}")
 
