@@ -19,8 +19,8 @@ intents.message_content = True
 intents.guilds = True
 
 # ID delle categorie o dei ruoli (Modifica con i tuoi dati)
-SUPPORT_ROLE_ID = 123456789012345678  # ID del ruolo Staff
-CATEGORY_TICKET_ID = 123456789012345678 # ID della categoria dove creare i ticket
+SUPPORT_ROLE_ID = 1352284377698144336  # ID del ruolo Staff
+CATEGORY_TICKET_ID = 1352281057273188354 # ID della categoria dove creare i ticket
 
 
 # --- Modal per la richiesta di unban ---
@@ -168,7 +168,7 @@ async def panel(ctx):
     )
     
     # Inserisci qui il tuo link Imgur
-    embed.set_image(url="IL_TUO_LINK_IMGUR")
+    embed.set_image(url="https://imgur.com/a/G6c7Lwg")
     
     view = UnbanDropView()
     await ctx.send(embed=embed, view=view)
