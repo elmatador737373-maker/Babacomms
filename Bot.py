@@ -198,12 +198,17 @@ class PersistentBot(commands.Bot):
 bot = PersistentBot()
 
 
-# --- Eventi di Benvenuto e Arrivederci (Con file locali dalla repository) ---
+# --- Eventi di Benvenuto e Arrivederci ---
 @bot.event
 async def on_member_join(member):
+    if member.bot:
+        return
+        
     channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
     if channel:
-        file = discord.File("benvenuto.png", filename="file_00000000125c720a85fa9d73a34549c7.png")
+        # Usa il nome reale del file nella repository e lo stesso nome per il filename dell'allegato
+        file = discord.File("file_00000000125c720a85fa9d73a34549c7.png", filename="file_00000000125c720a85fa9d73a34549c7.png")
+        
         embed = discord.Embed(
             title="🎉 • ʙᴇɴᴠᴇɴᴜᴛᴏ",
             description=(
@@ -223,9 +228,14 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
+    if member.bot:
+        return
+        
     channel = member.guild.get_channel(GOODBYE_CHANNEL_ID)
     if channel:
+        # Usa addio.png come file fisico e partenza.jpeg come richiamo interno
         file = discord.File("addio.png", filename="partenza.jpeg")
+        
         embed = discord.Embed(
             title="✈️ • ᴘᴀʀᴛᴇɴᴢᴀ",
             description=(
@@ -240,7 +250,6 @@ async def on_member_remove(member):
         )
         embed.set_image(url="attachment://partenza.jpeg")
         await channel.send(file=file, embed=embed)
-
 
 # --- Comando per inviare il pannello dei ticket ---
 @bot.command()
