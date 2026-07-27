@@ -5,6 +5,7 @@ from flask import Flask
 from dotenv import load_dotenv
 import discord
 from discord import app_commands
+from discord.ext import commands  # <--- Questa riga mancava o era cancellata!
 import requests
 from supabase import create_client, Client
 
