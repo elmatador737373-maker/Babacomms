@@ -1,9 +1,10 @@
 import os
+import io
 import discord
 from discord.ext import commands
 from flask import Flask
 
-# --- Configurazione Flask ---
+# --- Configurazione Flask (per tenere il bot attivo su hosting tipo Replit/Render) ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -19,54 +20,13 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True # Necessario per rilevare gli ingressi e le uscite dei membri
 
-# ID delle categorie o dei ruoli (Modifica con i tuoi dati)
-SUPPORT_ROLE_ID = 1352284377698144336  # ID del ruolo Staff
-CATEGORY_TICKET_ID = 1352281057273188354 # ID della categoria dove creare i ticket
-TICKET_LOG_CHANNEL_ID = 1494425912727572611 # ID del canale in cui inviare i log e i transcript
-WELCOME_CHANNEL_ID = 1352287128532418632 # ID del canale Benvenuto
-GOODBYE_CHANNEL_ID = 1494373723199901887 # ID del canale Arrivederci (Leave)
+# ID delle categorie, ruoli e canali inseriti
+SUPPORT_ROLE_ID = 1352284377698144336        # ID del ruolo Staff
+CATEGORY_TICKET_ID = 1352281057273188354     # ID della categoria dove creare i ticket
+TICKET_LOG_CHANNEL_ID = 1494425912727572611  # ID del canale in cui inviare i log e i transcript
+WELCOME_CHANNEL_ID = 1352287128532418632     # ID del canale Benvenuto
+GOODBYE_CHANNEL_ID = 1494373723199901887     # ID del canale Arrivederci (Leave)
 
-
-# --- Eventi di Benvenuto e Arrivederci (Leave) ---
-@bot.event
-async def on_member_join(member):
-    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-    if channel:
-        embed = discord.Embed(
-            title="🎉 • ʙᴇɴᴠᴇɴᴜᴛᴏ",
-            description=(
-                f"👋 Benvenuto {member.mention} nella zona Unban di Madison State Full RP!\n"
-                f"➢ 📍 Qui potrai richiedere assistenza riguardo ban, blacklist e controlli staff.\n"
-                f"➢ 📍 Leggi attentamente la guida sban nel canale <#1352295921999937686>.\n"
-                f"➢ 📍 Compila correttamente tutti i moduli richiesti.\n"
-                f"➢ 📍 Mantieni sempre un comportamento rispettoso verso lo staff.\n\n"
-                f"📌 Una richiesta ben compilata velocizzerà la revisione del tuo caso.\n"
-                f"💬 Per qualsiasi dubbio apri un ticket assistenza."
-            ),
-            color=discord.Color.green()
-        )
-        embed.set_image(url="https://imgur.com/a/rbbN8v4")
-        await channel.send(embed=embed)
-
-
-@bot.event
-async def on_member_remove(member):
-    channel = member.guild.get_channel(GOODBYE_CHANNEL_ID)
-    if channel:
-        embed = discord.Embed(
-            title="✈️ • ᴘᴀʀᴛᴇɴᴢᴀ",
-            description=(
-                f"👋 Il volo di {member.mention} è ufficialmente partito da Madison State Full RP!\n"
-                f"➢ 📍 Grazie per aver giocato con noi.\n"
-                f"➢ 📍 Speriamo di rivederti presto nella città di Madison.\n"
-                f"➢ 📍 Ogni storia lascia il segno… la tua continuerà altrove.\n\n"
-                f"📌 Ti auguriamo buona fortuna per il tuo prossimo percorso RP!\n"
-                f"💬 Arrivederci da tutta la community di Madison State FRP."
-            ),
-            color=discord.Color.red()
-        )
-        embed.set_image(url="IL_TUO_LINK_IMGUR_GOODBYE")
-        await channel.send(embed=embed)
 
 # --- Modal per la richiesta di unban ---
 class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
@@ -158,6 +118,7 @@ class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
 
         await interaction.followup.send(f"✅ Il tuo ticket è stato creato con successo: {ticket_channel.mention}", ephemeral=True)
 
+
 class UnbanSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -168,7 +129,6 @@ class UnbanSelect(discord.ui.Select):
                 value="open_unban_ticket"
             )
         ]
-        # Assegniamo un custom_id fisso fondamentale per la persistenza
         super().__init__(placeholder="Seleziona dal menù per aprire una richiesta...", min_values=1, max_values=1, options=options, custom_id="unban_persistent_select")
 
     async def callback(self, interaction: discord.Interaction):
@@ -177,7 +137,7 @@ class UnbanSelect(discord.ui.Select):
 
 class UnbanDropView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None) # Timeout None rende la view persistente
+        super().__init__(timeout=None)
         self.add_item(UnbanSelect())
 
 class TicketCloseView(discord.ui.View):
@@ -221,13 +181,13 @@ class TicketCloseView(discord.ui.View):
         # Elimina il canale del ticket
         await channel.delete()
 
-# --- Sottoclasse del Bot per gestire correttamente la persistenza tramite setup_hook ---
+
+# --- Configurazione del Bot con Viste Persistenti ---
 class PersistentBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Registriamo le viste in modo persistente prima che il bot sia pronto
         self.add_view(UnbanDropView())
         self.add_view(TicketCloseView())
         print("✅ Viste persistenti caricate correttamente.")
@@ -238,9 +198,56 @@ class PersistentBot(commands.Bot):
 bot = PersistentBot()
 
 
+# --- Eventi di Benvenuto e Arrivederci (Con file locali dalla repository) ---
+@bot.event
+async def on_member_join(member):
+    channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        file = discord.File("benvenuto.png", filename="benvenuto.png")
+        embed = discord.Embed(
+            title="🎉 • ʙᴇɴᴠᴇɴᴜᴛᴏ",
+            description=(
+                f"👋 Benvenuto {member.mention} nella zona Unban di Madison State Full RP!\n"
+                f"➢ 📍 Qui potrai richiedere assistenza riguardo ban, blacklist e controlli staff.\n"
+                f"➢ 📍 Leggi attentamente la guida sban nel canale <#1352295921999937686>.\n"
+                f"➢ 📍 Compila correttamente tutti i moduli richiesti.\n"
+                f"➢ 📍 Mantieni sempre un comportamento rispettoso verso lo staff.\n\n"
+                f"📌 Una richiesta ben compilata velocizzerà la revisione del tuo caso.\n"
+                f"💬 Per qualsiasi dubbio apri un ticket assistenza."
+            ),
+            color=discord.Color.green()
+        )
+        embed.set_image(url="attachment://benvenuto.png")
+        await channel.send(file=file, embed=embed)
+
+
+@bot.event
+async def on_member_remove(member):
+    channel = member.guild.get_channel(GOODBYE_CHANNEL_ID)
+    if channel:
+        file = discord.File("addio.png", filename="addio.png")
+        embed = discord.Embed(
+            title="✈️ • ᴘᴀʀᴛᴇɴᴢᴀ",
+            description=(
+                f"👋 Il volo di {member.mention} è ufficialmente partito da Madison State Full RP!\n"
+                f"➢ 📍 Grazie per aver giocato con noi.\n"
+                f"➢ 📍 Speriamo di rivederti presto nella città di Madison.\n"
+                f"➢ 📍 Ogni storia lascia il segno… la tua continuerà altrove.\n\n"
+                f"📌 Ti auguriamo buona fortuna per il tuo prossimo percorso RP!\n"
+                f"💬 Arrivederci da tutta la community di Madison State FRP."
+            ),
+            color=discord.Color.red()
+        )
+        embed.set_image(url="attachment://addio.png")
+        await channel.send(file=file, embed=embed)
+
+
+# --- Comando per inviare il pannello dei ticket ---
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def panel(ctx):
+    file = discord.File("pannello.png", filename="pannello.png")
+    
     embed = discord.Embed(
         title="Madison Unban",
         description=(
@@ -259,11 +266,10 @@ async def panel(ctx):
         color=discord.Color.from_rgb(43, 45, 49)
     )
     
-    # Inserisci qui il tuo link Imgur
-    embed.set_image(url="https://imgur.com/a/G6c7Lwg")
+    embed.set_image(url="attachment://pannello.png")
     
     view = UnbanDropView()
-    await ctx.send(embed=embed, view=view)
+    await ctx.send(file=file, embed=embed, view=view)
     await ctx.message.delete()
 
 
