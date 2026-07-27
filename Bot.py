@@ -125,7 +125,7 @@ class UnbanSelect(discord.ui.Select):
             discord.SelectOption(
                 label="Richiesta Unban",
                 description="Apri un ticket per richiedere la revoca del ban",
-                emoji="🔓",
+                emoji="<:MadisonStateUnban:1494380677389488237>",
                 value="open_unban_ticket"
             )
         ]
