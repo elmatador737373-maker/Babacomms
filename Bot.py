@@ -26,6 +26,11 @@ WELCOME_CHANNEL_ID = 1352287128532418632     # ID del canale Benvenuto
 GOODBYE_CHANNEL_ID = 1494373723199901887     # ID del canale Arrivederci (Leave)
 
 
+@bot.command()
+async def testmember(ctx):
+    # Mostra quanti membri il bot vede attualmente nella sua cache interna
+    await ctx.send(f"👥 Membri totali cache bot nella gilda: {len(ctx.guild.members)}")
+
 # --- Modal per la richiesta di unban ---
 class UnbanModal(discord.ui.Modal, title="Richiesta di Unban - Modulo"):
     when_banned = discord.ui.TextInput(
