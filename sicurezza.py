@@ -648,7 +648,7 @@ class WhitelistActionConfirmView(discord.ui.View):
             await interaction.response.edit_message(content=f"❌ Errore durante la rimozione su Supabase: `{e}`", view=None)
 
 
-# --- CONFIGURAZIONE CANALI LOG SU DB ---
+# --- CONFIGURAZIONE CANALI LOG SU DB (CON PAGINAZIONE A BLOCCHI) ---
 
 class LogChannelSelect(discord.ui.Select):
     def __init__(self, guild: discord.Guild):
@@ -666,28 +666,39 @@ class LogChannelSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
-            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+            return await interaction.2.response.send_message("❌ Non hai i permessi.", ephemeral=True) if hasattr(interaction, 'response') else await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
         log_type = self.values[0]
-        view = ChannelPickerView(log_type, self.guild)
+        view = ChannelPickerView(log_type, self.guild, page=0)
         embed = discord.Embed(
-            title=f"📋 Scegli il canale per: `{log_type}`",
-            description="Seleziona il canale di testo desiderato dal menu sottostante.",
+            title=f"📋 Scegli il canale per: `{log_type}` (Pagina 1)",
+            description="Seleziona il canale di testo desiderato dal menu sottostante. Usa i pulsanti per cambiare pagina se hai molti canali.",
             color=discord.Color.blurple()
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
 
 class ChannelPickerSelect(discord.ui.Select):
-    def __init__(self, log_type: str, guild: discord.Guild):
+    def __init__(self, log_type: str, guild: discord.Guild, page: int = 0):
         self.log_type = log_type
-        text_channels = [ch for ch in guild.text_channels][:25]
+        text_channels = [ch for ch in guild.text_channels]
+        
+        # Suddividiamo i canali in blocchi da 25
+        self.chunk_size = 25
+        self.total_pages = max(1, (len(text_channels) + self.chunk_size - 1) // self.chunk_size)
+        self.current_page = max(0, min(page, self.total_pages - 1))
+        
+        start_idx = self.current_page * self.chunk_size
+        end_idx = start_idx + self.chunk_size
+        current_channels = text_channels[start_idx:end_idx]
+        
         options = [
             discord.SelectOption(label=f"#{ch.name}", value=str(ch.id), description=f"ID: {ch.id}")
-            for ch in text_channels
+            for ch in current_channels
         ]
         if not options:
             options.append(discord.SelectOption(label="Nessun canale disponibile", value="none"))
-        super().__init__(placeholder="Scegli il canale...", min_values=1, max_values=1, options=options)
+            
+        super().__init__(placeholder=f"Scegli il canale (Pagina {self.current_page + 1}/{self.total_pages})...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         if not await is_owner_or_guild_owner(interaction):
@@ -702,16 +713,58 @@ class ChannelPickerSelect(discord.ui.Select):
 
 
 class ChannelPickerView(discord.ui.View):
-    def __init__(self, log_type: str, guild: discord.Guild):
+    def __init__(self, log_type: str, guild: discord.Guild, page: int = 0):
         super().__init__(timeout=180)
-        self.add_item(ChannelPickerSelect(log_type, guild))
+        self.log_type = log_type
+        self.guild = guild
+        self.page = page
+        
+        # Calcoliamo il totale delle pagine per gestire lo stato dei pulsanti
+        text_channels = [ch for ch in guild.text_channels]
+        total_pages = max(1, (len(text_channels) + 24) // 25)
+        self.total_pages = total_pages
+        
+        # Aggiungiamo il selettore dei canali per la pagina corrente
+        self.picker_select = ChannelPickerSelect(log_type, guild, page)
+        self.add_item(self.picker_select)
+
+    @discord.ui.button(label="⬅️ Indietro", style=discord.ButtonStyle.secondary, row=1)
+    async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        if self.page > 0:
+            self.page -= 1
+            new_view = ChannelPickerView(self.log_type, self.guild, self.page)
+            embed = discord.Embed(
+                title=f"📋 Scegli il canale per: `{self.log_type}` (Pagina {self.page + 1}/{self.total_pages})",
+                description="Seleziona il canale di testo desiderato dal menu sottostante.",
+                color=discord.Color.blurple()
+            )
+            await interaction.response.edit_message(embed=embed, view=new_view)
+        else:
+            await interaction.response.defer()
+
+    @discord.ui.button(label="Avanti ➡️", style=discord.ButtonStyle.secondary, row=1)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await is_owner_or_guild_owner(interaction):
+            return await interaction.response.send_message("❌ Non hai i permessi.", ephemeral=True)
+        if self.page < self.total_pages - 1:
+            self.page += 1
+            new_view = ChannelPickerView(self.log_type, self.guild, self.page)
+            embed = discord.Embed(
+                title=f"📋 Scegli il canale per: `{self.log_type}` (Pagina {self.page + 1}/{self.total_pages})",
+                description="Seleziona il canale di testo desiderato dal menu sottostante.",
+                color=discord.Color.blurple()
+            )
+            await interaction.response.edit_message(embed=embed, view=new_view)
+        else:
+            await interaction.response.defer()
 
 
 class LogChannelSelectView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
         super().__init__(timeout=180)
         self.add_item(LogChannelSelect(guild))
-
 
 class SettingsMainView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
