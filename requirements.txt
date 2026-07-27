@@ -1,8 +1,5 @@
 discord.py
-flask
-requests
-discord.py
 supabase
-flask
-python-dotenv⁠
-
+python-dotenv
+Flask
+requests
