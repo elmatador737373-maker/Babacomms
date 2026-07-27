@@ -15,10 +15,8 @@ def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
 # --- Configurazione Discord Bot ---
-intents = discord.Intents.default()
-intents.message_content = True
-intents.guilds = True
-intents.members = True # Necessario per rilevare gli ingressi e le uscite dei membri
+# Usiamo all() per abilitare tutti gli intenti ed evitare blocchi di ricezione eventi
+intents = discord.Intents.all()
 
 # ID delle categorie, ruoli e canali inseriti
 SUPPORT_ROLE_ID = 1352284377698144336        # ID del ruolo Staff
@@ -203,112 +201,87 @@ class PersistentBot(commands.Bot):
 bot = PersistentBot()
 
 
-# --- Eventi di Benvenuto e Arrivederci (Con Debug Completo) ---
+# --- Eventi di Benvenuto e Arrivederci ---
 @bot.event
 async def on_member_join(member):
-    print(f"\n[DEBUG JOIN] ----------------------------------------")
-    print(f"[DEBUG JOIN] Rilevato ingresso utente: {member.name} (ID: {member.id})")
-    print(f"[DEBUG JOIN] L'utente è un bot? -> {member.bot}")
+    print(f"EVENTO RICEVUTO: {member.name} è entrato nel server {member.guild.name} (ID: {member.guild.id})")
     
     if member.bot:
-        print("[DEBUG JOIN] Ignorato perché è un bot.")
         return
         
     channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-    print(f"[DEBUG JOIN] ID Canale Benvenuto configurato: {WELCOME_CHANNEL_ID}")
-    print(f"[DEBUG JOIN] Canale trovato nel server? -> {channel}")
+    if not channel:
+        print(f"ERRORE: Canale benvenuto con ID {WELCOME_CHANNEL_ID} non trovato!")
+        return
 
-    if channel:
-        try:
-            file_path = "file_00000000125c720a85fa9d73a34549c7.png"
-            file_esiste = os.path.exists(file_path)
-            print(f"[DEBUG JOIN] Il file '{file_path}' esiste nella cartella? -> {file_esiste}")
+    try:
+        file_path = "file_00000000125c720a85fa9d73a34549c7.png"
+        file = discord.File(file_path, filename="file_00000000125c720a85fa9d73a34549c7.png") if os.path.exists(file_path) else None
 
-            if file_esiste:
-                file = discord.File(file_path, filename="file_00000000125c720a85fa9d73a34549c7.png")
-            else:
-                print(f"[DEBUG JOIN] ERRORE: Il file immagine '{file_path}' NON è stato trovato nella repository!")
-                file = None
-
-            embed = discord.Embed(
-                title="🎉 • ʙᴇɴᴠᴇɴᴜᴛᴏ",
-                description=(
-                    f"👋 Benvenuto {member.mention} nella zona Unban di Madison State Full RP!\n"
-                    f"➢ 📍 Qui potrai richiedere assistenza riguardo ban, blacklist e controlli staff.\n"
-                    f"➢ 📍 Leggi attentamente la guida sban nel canale <#1352295921999937686>.\n"
-                    f"➢ 📍 Compila correttamente tutti i moduli richiesti.\n"
-                    f"➢ 📍 Mantieni sempre un comportamento rispettoso verso lo staff.\n\n"
-                    f"📌 Una richiesta ben compilata velocizzerà la revisione del tuo caso.\n"
-                    f"💬 Per qualsiasi dubbio apri un ticket assistenza."
-                ),
-                color=discord.Color.green()
-            )
+        embed = discord.Embed(
+            title="🎉 • ʙᴇɴᴠᴇɴᴜᴛᴏ",
+            description=(
+                f"👋 Benvenuto {member.mention} nella zona Unban di Madison State Full RP!\n"
+                f"➢ 📍 Qui potrai richiedere assistenza riguardo ban, blacklist e controlli staff.\n"
+                f"➢ 📍 Leggi attentamente la guida sban nel canale <#1352295921999937686>.\n"
+                f"➢ 📍 Compila correttamente tutti i moduli richiesti.\n"
+                f"➢ 📍 Mantieni sempre un comportamento rispettoso verso lo staff.\n\n"
+                f"📌 Una richiesta ben compilata velocizzerà la revisione del tuo caso.\n"
+                f"💬 Per qualsiasi dubbio apri un ticket assistenza."
+            ),
+            color=discord.Color.green()
+        )
+        
+        if file:
+            embed.set_image(url="attachment://file_00000000125c720a85fa9d73a34549c7.png")
+            await channel.send(file=file, embed=embed)
+        else:
+            await channel.send(embed=embed)
             
-            if file:
-                embed.set_image(url="attachment://file_00000000125c720a85fa9d73a34549c7.png")
-                await channel.send(file=file, embed=embed)
-            else:
-                await channel.send(embed=embed)
-                
-            print("[DEBUG JOIN] SUCCESS: Messaggio di benvenuto inviato con successo!")
-        except Exception as e:
-            print(f"[DEBUG JOIN] ERRORE CRITICO durante l'invio del benvenuto: {e}")
-    else:
-        print("[DEBUG JOIN] ERRORE: Impossibile inviare il messaggio, canale non valido o non trovato.")
-    print(f"[DEBUG JOIN] ----------------------------------------\n")
+        print("SUCCESS: Messaggio di benvenuto inviato con successo!")
+    except Exception as e:
+        print(f"ERRORE CRITICO BENVENUTO: {e}")
 
 
 @bot.event
 async def on_member_remove(member):
-    print(f"\n[DEBUG REMOVE] ----------------------------------------")
-    print(f"[DEBUG REMOVE] Rilevata uscita utente: {member.name} (ID: {member.id})")
-    print(f"[DEBUG REMOVE] L'utente era un bot? -> {member.bot}")
+    print(f"EVENTO RICEVUTO: {member.name} è uscito dal server {member.guild.name}")
     
     if member.bot:
-        print("[DEBUG REMOVE] Ignorato perché è un bot.")
         return
         
     channel = member.guild.get_channel(GOODBYE_CHANNEL_ID)
-    print(f"[DEBUG REMOVE] ID Canale Arrivederci configurato: {GOODBYE_CHANNEL_ID}")
-    print(f"[DEBUG REMOVE] Canale trovato nel server? -> {channel}")
+    if not channel:
+        print(f"ERRORE: Canale arrivederci con ID {GOODBYE_CHANNEL_ID} non trovato!")
+        return
 
-    if channel:
-        try:
-            file_path = "partenza.jpeg"
-            file_esiste = os.path.exists(file_path)
-            print(f"[DEBUG REMOVE] Il file '{file_path}' esiste nella cartella? -> {file_esiste}")
+    try:
+        file_path = "partenza.jpeg"
+        file = discord.File(file_path, filename="partenza.jpeg") if os.path.exists(file_path) else None
 
-            if file_esiste:
-                file = discord.File(file_path, filename="partenza.jpeg")
-            else:
-                print(f"[DEBUG REMOVE] ERRORE: Il file immagine '{file_path}' NON è stato trovato nella repository!")
-                file = None
-
-            embed = discord.Embed(
-                title="✈️ • ᴘᴀʀᴛᴇɴᴢᴀ",
-                description=(
-                    f"👋 Il volo di {member.mention} è ufficialmente partito da Madison State Full RP!\n"
-                    f"➢ 📍 Grazie per aver giocato con noi.\n"
-                    f"➢ 📍 Speriamo di rivederti presto nella città di Madison.\n"
-                    f"➢ 📍 Ogni storia lascia il segno… la tua continuerà altrove.\n\n"
-                    f"📌 Ti auguriamo buona fortuna per il tuo prossimo percorso RP!\n"
-                    f"💬 Arrivederci da tutta la community di Madison State FRP."
-                ),
-                color=discord.Color.red()
-            )
+        embed = discord.Embed(
+            title="✈️ • ᴘᴀʀᴛᴇɴᴢᴀ",
+            description=(
+                f"👋 Il volo di {member.mention} è ufficialmente partito da Madison State Full RP!\n"
+                f"➢ 📍 Grazie per aver giocato con noi.\n"
+                f"➢ 📍 Speriamo di rivederti presto nella città di Madison.\n"
+                f"➢ 📍 Ogni storia lascia il segno… la tua continuerà altrove.\n\n"
+                f"📌 Ti auguriamo buona fortuna per il tuo prossimo percorso RP!\n"
+                f"💬 Arrivederci da tutta la community di Madison State FRP."
+            ),
+            color=discord.Color.red()
+        )
+        
+        if file:
+            embed.set_image(url="attachment://partenza.jpeg")
+            await channel.send(file=file, embed=embed)
+        else:
+            await channel.send(embed=embed)
             
-            if file:
-                embed.set_image(url="attachment://partenza.jpeg")
-                await channel.send(file=file, embed=embed)
-            else:
-                await channel.send(embed=embed)
-                
-            print("[DEBUG REMOVE] SUCCESS: Messaggio di arrivederci inviato con successo!")
-        except Exception as e:
-            print(f"[DEBUG REMOVE] ERRORE CRITICO durante l'invio dell'addio: {e}")
-    else:
-        print("[DEBUG REMOVE] ERRORE: Impossibile inviare il messaggio, canale non valido o non trovato.")
-    print(f"[DEBUG REMOVE] ----------------------------------------\n")
+        print("SUCCESS: Messaggio di arrivederci inviato con successo!")
+    except Exception as e:
+        print(f"ERRORE CRITICO ARRIVEDERCI: {e}")
+
 
 # --- Comando per inviare il pannello dei ticket ---
 @bot.command()
