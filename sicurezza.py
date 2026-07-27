@@ -5,6 +5,25 @@ import json
 import time
 from collections import defaultdict
 from supabase import create_client, Client
+from threading import Thread
+from flask import Flask
+
+# ==========================================
+# 🌐 MINI SERVER FLASK (Per Hosting)
+# ==========================================
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Madison State Logs & Security is Online!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.start()
+
 
 # ==========================================
 # ⚙️ CONFIGURAZIONE INIZIALE & SUPABASE
@@ -145,11 +164,8 @@ async def on_ready():
     print(f"Bot online come {bot.user} (ID: {bot.user.id})")
     await load_config_from_supabase()
     try:
-        # Sincronizzazione istantanea per il tuo server specifico
-        guild_id = discord.Object(id=1531305565496672266) 
-        bot.tree.copy_global_to(guild=guild_id)
-        synced = await bot.tree.sync(guild=guild_id)
-        print(f"Comandi Slash sincronizzati sul server: {len(synced)}")
+        synced = await bot.tree.sync()
+        print(f"Comandi Slash sincronizzati: {len(synced)}")
     except Exception as e:
         print(f"Errore nella sincronizzazione dei comandi: {e}")
 
@@ -166,7 +182,6 @@ async def send_typed_log(guild: discord.Guild, log_type: str, embed: discord.Emb
     channel = guild.get_channel(channel_id)
     if channel:
         try:
-            # Branding coerente per ogni log inviato
             embed.set_footer(
                 text=f"Madison State • Security & Logs System", 
                 icon_url=guild.icon.url if guild.icon else None
@@ -895,4 +910,5 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
 
 
 if __name__ == "__main__":
+    keep_alive()  # Avvia Flask in un thread separato
     bot.run(TOKEN)
