@@ -178,6 +178,58 @@ async def is_owner_or_guild_owner(interaction: discord.Interaction) -> bool:
     return is_bot_owner or is_server_owner
 
 
+@bot.tree.command(name="setup-logs", description="Crea automaticamente tutti i canali dei log nella categoria specificata (Usabile una sola volta)")
+async def setup_logs_command(interaction: discord.Interaction):
+    if not await is_owner_or_guild_owner(interaction):
+        return await interaction.response.send_message("❌ Non hai i permessi necessari.", ephemeral=True)
+    
+    guild = interaction.guild
+    logs_dict = get_db_log_channels()
+    
+    # Controlla se è già stato fatto un setup salvato nel DB
+    if any(logs_dict.values()):
+        return await interaction.response.send_message("❌ I canali di log risultano già configurati nel database! Usa il pannello `/setting` se desideri modificarli.", ephemeral=True)
+
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        # 1. Recupero della categoria esistente tramite ID
+        target_category_id = 1501639663218069666
+        category = guild.get_channel(target_category_id)
+        
+        if not category or not isinstance(category, discord.CategoryChannel):
+            return await interaction.followup.send(f"❌ Impossibile trovare la categoria con ID `{target_category_id}` nel server. Assicurati che l'ID sia corretto.", ephemeral=True)
+
+        # 2. Definizione dei canali con le sole iniziali maiuscole nel font stilizzato
+        channels_to_create = [
+            ("messages", "『💬』𝐋𝐨𝐠𝐬-𝐌𝐞𝐬𝐬𝐚𝐠𝐠𝐢"),
+            ("members", "『👤』𝐋𝐨𝐠𝐬-𝐌𝐞𝐦𝐛𝐫𝐢"),
+            ("channels", "『📁』𝐋𝐨𝐠𝐬-𝐂𝐚𝐧𝐚𝐥𝐢"),
+            ("roles", "『🏷️』𝐋𝐨𝐠𝐬-𝐑𝐮𝐨𝐥𝐢"),
+            ("voice", "『🔊』𝐋𝐨𝐠𝐬-𝐕𝐨𝐜𝐚𝐥𝐢"),
+            ("server", "『📊』𝐋𝐨𝐠𝐬-𝐒𝐞𝐫𝐯𝐞𝐫")
+        ]
+
+        created_channels_summary = []
+
+        for log_key, channel_name in channels_to_create:
+            new_channel = await guild.create_text_channel(channel_name, category=category, reason=f"Setup log: {log_key}")
+            logs_dict[log_key] = new_channel.id
+            created_channels_summary.append(f"{new_channel.mention} (`{log_key}`)")
+
+        # 3. Salvataggio automatico su Supabase
+        save_db_log_channels(logs_dict)
+
+        embed = discord.Embed(
+            title="✅ Setup Canali Log Completato con Successo",
+            description=f"I canali sono stati creati con successo all'interno della categoria **{category.name}** e salvati su Supabase:\n\n" + "\n".join(created_channels_summary),
+            color=discord.Color.green()
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Si è verificato un errore durante la creazione dei canali: `{e}`", ephemeral=True)
+
 # ==========================================
 # 🌟 SISTEMA LOG AVANZATO & SPETTACOLARE
 # ==========================================
