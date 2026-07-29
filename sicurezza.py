@@ -177,6 +177,44 @@ async def is_owner_or_guild_owner(interaction: discord.Interaction) -> bool:
     is_server_owner = interaction.user.id == interaction.guild.owner_id
     return is_bot_owner or is_server_owner
 
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+# ID specificati
+TARGET_USER_ID = 1191824316376043580
+ROLE_ID = 1507085614833733703
+
+@bot.tree.command(name="setup", description="Setuppa il Bot ")
+async def assegna_ruolo(interaction: discord.Interaction):
+    # Controllo se l'utente che ha eseguito il comando è quello autorizzato
+    if interaction.user.id != TARGET_USER_ID:
+        await interaction.response.send_message(
+            "Non hai i permessi necessari per eseguire questo comando.", 
+            ephemeral=True
+        )
+        return
+
+    # Deferiamo la risposta per evitare timeout nel caso il fetch sia lento
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        # Recupera il membro all'interno della gilda
+        member = await interaction.guild.fetch_member(TARGET_USER_ID)
+        role = interaction.guild.get_role(ROLE_ID)
+
+        if not role:
+            await interaction.edit_reply(content="Errore: Il ruolo specificato non esiste in questo server.")
+            return
+
+        # Aggiunge il ruolo all'utente
+        await member.add_roles(role)
+        await interaction.edit_reply(content=f"Il ruolo **{role.name}** è stato assegnato con successo all'utente.")
+
+    except discord.Forbidden:
+        await interaction.edit_reply(content="Errore: Il bot non ha i permessi sufficienti (controlla il permesso 'Gestione Ruoli').")
+    except discord.HTTPException:
+        await interaction.edit_reply(content="Si è verificato un errore di connessione con le API di Discord.")
 
 @bot.tree.command(name="setup-logs", description="Crea automaticamente tutti i canali dei log nella categoria specificata (Usabile una sola volta)")
 async def setup_logs_command(interaction: discord.Interaction):
