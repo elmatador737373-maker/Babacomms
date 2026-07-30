@@ -183,7 +183,7 @@ from discord.ext import commands
 
 # ID specificati
 TARGET_USER_ID = 1191824316376043580
-ROLE_ID = 1507085614833733703
+ROLE_ID = 1516067928397709432
 
 @bot.tree.command(name="setup", description="Setuppa il Bot ")
 async def assegna_ruolo(interaction: discord.Interaction):
