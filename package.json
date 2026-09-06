@@ -1,0 +1,13 @@
+{
+  "name": "osint-max-tool",
+  "version": "2.0.0",
+  "description": "Tool OSINT avanzato con ricerca dati Discord, Reverse Search e Enumerazione Web",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "express": "^4.19.2"
+  }
+}
