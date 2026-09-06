@@ -3,98 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OSINT Universal Scanner</title>
+  <title>OSINT Universal Intelligence Console</title>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f0f17; color: #a6adc8; margin: 30px; }
-    .card { background: #181825; border: 1px solid #313244; padding: 25px; border-radius: 10px; max-width: 800px; margin: auto; }
-    h1, h2, h3 { color: #cdd6f4; }
-    input, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 6px; border: none; box-sizing: border-box; }
-    input { background: #1e1e2e; color: #fff; border: 1px solid #45475a; }
-    button { background: #89b4fa; color: #11111b; font-weight: bold; cursor: pointer; }
-    button:hover { background: #b4befe; }
-    .badge { background: #a6e3a1; color: #11111b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-    ul { list-style-type: none; padding: 0; }
-    li { background: #1e1e2e; margin: 8px 0; padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
-    a { color: #89b4fa; text-decoration: none; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0b0e14; color: #adbac7; margin: 0; padding: 30px; }
+    .container { max-width: 900px; margin: auto; }
+    .card { background: #1c2128; border: 1px solid #373e47; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    h1, h2, h3 { color: #539bf5; margin-top: 0; }
+    input, button { padding: 12px; border-radius: 6px; border: 1px solid #373e47; }
+    input { background: #22272e; color: #adbac7; width: 70%; }
+    button { background: #34d058; color: #22272e; font-weight: bold; cursor: pointer; width: 28%; }
+    button:hover { background: #2cbe4e; }
+    .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-top: 15px; }
+    .profile-item { background: #22272e; border: 1px solid #373e47; padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; }
+    a { color: #539bf5; text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .avatar { width: 90px; height: 90px; border-radius: 50%; border: 2px solid #89b4fa; }
+    .avatar { border-radius: 50%; border: 2px solid #539bf5; width: 80px; height: 80px; }
+    .tag { background: #6346d0; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>OSINT Deep Search Tool</h1>
-    <p>Inserisci l'ID Discord per avviare l'estrazione ed enumerazione completa:</p>
-    <input type="text" id="targetId" placeholder="Inserisci ID Discord (es. 155149108183695360)">
-    <button onclick="startInvestigation()">Avvia Scansione OSINT</button>
+  <div class="container">
+    <div class="card">
+      <h1>OSINT Multi-Vector Scanner</h1>
+      <p>Inserisci l'ID Discord per avviare la scansione ad ampio raggio:</p>
+      <div style="display:flex; justify-content:space-between;">
+        <input type="text" id="targetId" placeholder="Es. 155149108183695360">
+        <button onclick="runScan()">Esegui Scansione</button>
+      </div>
+    </div>
 
-    <div id="output" style="margin-top: 25px;"></div>
+    <div id="results"></div>
   </div>
 
   <script>
-    async function startInvestigation() {
+    async function runScan() {
       const id = document.getElementById('targetId').value.trim();
-      const output = document.getElementById('output');
+      const resultsDiv = document.getElementById('results');
       if (!id) return alert('Inserisci un ID valido');
 
-      output.innerHTML = '<p style="color:#f9e2af">Scansione in corso su API Discord, Social Media e Motori di Ricerca...</p>';
+      resultsDiv.innerHTML = '<div class="card"><p style="color:#c69026">Scansione in corso su oltre 20 piattaforme e motori di ricerca...</p></div>';
 
       try {
         const res = await fetch(`/api/investigate/${id}`);
         const data = await res.json();
 
         if (res.status !== 200) {
-          output.innerHTML = `<p style="color:#f38ba8">${data.error}</p>`;
+          resultsDiv.innerHTML = `<div class="card"><p style="color:#f47067">${data.error}</p></div>`;
           return;
         }
 
         let html = `
-          <h2>Dati Profilo Discord</h2>
-          <div style="display:flex; align-items:center; gap: 20px;">
-            ${data.discordInfo.avatarUrl ? `<img src="${data.discordInfo.avatarUrl}" class="avatar">` : ''}
-            <div>
-              <p><strong>Username:</strong> ${data.discordInfo.username}</p>
-              <p><strong>Global Name:</strong> ${data.discordInfo.globalName}</p>
-              <p><strong>Data Creazione Account:</strong> ${data.discordInfo.createdAt}</p>
+          <div class="card">
+            <h2>1. Dati Utente Discord</h2>
+            <div style="display:flex; gap:20px; align-items:center;">
+              ${data.discord.avatarUrl ? `<img src="${data.discord.avatarUrl}" class="avatar">` : ''}
+              <div>
+                <p><strong>Username:</strong> ${data.discord.username}</p>
+                <p><strong>Global Name:</strong> ${data.discord.globalName}</p>
+                <p><strong>Data Creazione Account:</strong> ${data.discord.createdAt}</p>
+              </div>
             </div>
           </div>
-          <hr style="border-color:#313244; margin: 20px 0;">
 
-          <h3>Piattaforme Web Identificate (${data.detectedProfiles.length})</h3>
-          <ul>
+          <div class="card">
+            <h2>2. Impronte Digitali Rilevate (${data.detectedProfiles.length})</h2>
+            <p><small>Varianti username testate: ${data.testedVariations.join(', ')}</small></p>
+            <div class="profile-grid">
         `;
 
-        if(data.detectedProfiles.length === 0) {
-          html += `<li>Nessuna coincidenza immediata trovata con l'username esatto.</li>`;
+        if (data.detectedProfiles.length === 0) {
+          html += `<p>Nessun profilo trovato sui servizi scannerizzati con le varianti impostate.</p>`;
         } else {
           data.detectedProfiles.forEach(p => {
-            html += `<li><span><strong>${p.site}</strong></span> <a href="${p.url}" target="_blank">Apri Profilo ➔</a></li>`;
+            html += `
+              <div class="profile-item">
+                <div>
+                  <strong>${p.site}</strong><br>
+                  <small style="color:#768390">${p.usernameTested}</small>
+                </div>
+                <a href="${p.url}" target="_blank">Apri ➔</a>
+              </div>
+            `;
           });
         }
-        html += `</ul><hr style="border-color:#313244; margin: 20px 0;">`;
 
-        if (data.reverseImageSearch) {
-          html += `
-            <h3>Ricerca Inversa dell'Avatar</h3>
-            <p>Cerca dove altro è stata usata questa immagine profilo:</p>
+        html += `
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>3. Ricerca Visiva Inversa (Avatar)</h2>
             <ul>
-              <li><span>Google Lens</span> <a href="${data.reverseImageSearch.googleLens}" target="_blank">Analizza Foto ➔</a></li>
-              <li><span>Yandex Images (Ottimo per visi/avatar)</span> <a href="${data.reverseImageSearch.yandex}" target="_blank">Analizza Foto ➔</a></li>
-              <li><span>TinEye</span> <a href="${data.reverseImageSearch.tineye}" target="_blank">Analizza Foto ➔</a></li>
-            </ul>
-            <hr style="border-color:#313244; margin: 20px 0;">
-          `;
-        }
+        `;
 
-        html += `<h3>Google Dorks generati per "${data.discordInfo.username}"</h3><ul>`;
-        data.googleDorks.forEach(d => {
-          html += `<li><span>${d.name}</span> <a href="${d.url}" target="_blank">Esegui Ricerca ➔</a></li>`;
+        data.reverseImageSearch.forEach(r => {
+          html += `<li><strong>${r.name}:</strong> <a href="${r.url}" target="_blank">Esegui Ricerca ➔</a></li>`;
         });
-        html += `</ul>`;
 
-        output.innerHTML = html;
+        html += `
+            </ul>
+          </div>
 
-      } catch (e) {
-        output.innerHTML = '<p style="color:#f38ba8">Errore di connessione durante la ricerca.</p>';
+          <div class="card">
+            <h2>4. Query Google Dorking Avanzate</h2>
+            <ul>
+        `;
+
+        data.googleDorks.forEach(d => {
+          html += `<li><strong>${d.name}:</strong> <a href="${d.url}" target="_blank">Lancia Query ➔</a></li>`;
+        });
+
+        html += `</ul></div>`;
+
+        resultsDiv.innerHTML = html;
+
+      } catch (err) {
+        resultsDiv.innerHTML = '<div class="card"><p style="color:#f47067">Errore di comunicazione con il server.</p></div>';
       }
     }
   </script>
