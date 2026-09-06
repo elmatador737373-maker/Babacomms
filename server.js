@@ -9,7 +9,6 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Calcolo della data di creazione dall'ID Discord
 function getCreationDate(snowflakeId) {
   try {
     const discordEpoch = 1420070400000n;
@@ -21,97 +20,131 @@ function getCreationDate(snowflakeId) {
   }
 }
 
-// Lista dinamica di endpoint per l'enumerazione di massa su Fonti Aperte
-const TARGET_SITES = [
-  { name: 'GitHub', url: 'https://github.com/{}', check: 'status' },
-  { name: 'Reddit', url: 'https://www.reddit.com/user/{}', check: 'status' },
-  { name: 'Twitch', url: 'https://www.twitch.tv/{}', check: 'status' },
-  { name: 'Pinterest', url: 'https://www.pinterest.com/{}/', check: 'status' },
-  { name: 'SoundCloud', url: 'https://soundcloud.com/{}', check: 'status' },
-  { name: 'Steam', url: 'https://steamcommunity.com/id/{}', check: 'status' },
-  { name: 'DockerHub', url: 'https://hub.docker.com/u/{}', check: 'status' },
-  { name: 'Medium', url: 'https://medium.com/@{}', check: 'status' },
-  { name: 'Patreon', url: 'https://www.patreon.com/{}', check: 'status' },
-  { name: 'Linktree', url: 'https://linktr.ee/{}', check: 'status' }
+// Generatore di permutazioni per l'username
+function generateUsernameVariations(baseName) {
+  const clean = baseName.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+  const list = new Set([clean]);
+  
+  // Aggiunta varianti comuni usate online
+  list.add(`${clean}_`);
+  list.add(`real_${clean}`);
+  list.add(`${clean}1`);
+  list.add(`${clean}official`);
+
+  return Array.from(list);
+}
+
+// Lista estesa di piattaforme target per la verifica delle impronte digitali
+const TARGET_PLATFORMS = [
+  // Social & Content
+  { name: 'GitHub', url: 'https://github.com/{}' },
+  { name: 'Reddit', url: 'https://www.reddit.com/user/{}' },
+  { name: 'Twitch', url: 'https://www.twitch.tv/{}' },
+  { name: 'Pinterest', url: 'https://www.pinterest.com/{}/' },
+  { name: 'SoundCloud', url: 'https://soundcloud.com/{}' },
+  { name: 'Medium', url: 'https://medium.com/@{}' },
+  { name: 'TikTok', url: 'https://www.tiktok.com/@{}' },
+  { name: 'Vimeo', url: 'https://vimeo.com/{}' },
+  { name: 'DeviantArt', url: 'https://www.deviantart.com/{}' },
+  // Gaming
+  { name: 'Steam', url: 'https://steamcommunity.com/id/{}' },
+  { name: 'Roblox', url: 'https://www.roblox.com/user.aspx?username={}' },
+  { name: 'Chess.com', url: 'https://www.chess.com/member/{}' },
+  // Coding & Tech
+  { name: 'DockerHub', url: 'https://hub.docker.com/u/{}' },
+  { name: 'Replit', url: 'https://replit.com/@{}' },
+  { name: 'npm', url: 'https://www.npmjs.com/~{}' },
+  // Monetizzazione & Donazioni Pubbliche
+  { name: 'Linktree', url: 'https://linktr.ee/{}' },
+  { name: 'Patreon', url: 'https://www.patreon.com/{}' },
+  { name: 'BuyMeACoffee', url: 'https://www.buymeacoffee.com/{}' },
+  { name: 'Ko-fi', url: 'https://ko-fi.com/{}' },
+  { name: 'PayPal.me', url: 'https://www.paypal.com/paypalme/{}' }
 ];
 
-// Endpoint principale OSINT
 app.get('/api/investigate/:id', async (req, res) => {
   const userId = req.params.id;
 
   if (!DISCORD_BOT_TOKEN) {
-    return res.status(500).json({ error: 'Configura la variabile DISCORD_BOT_TOKEN su Render!' });
+    return res.status(500).json({ error: 'Configura DISCORD_BOT_TOKEN su Render!' });
   }
 
   try {
-    // 1. Estrazione dati nativi Discord API
+    // 1. Estrazione dati Discord API
     const discordRes = await axios.get(`https://discord.com/api/v10/users/${userId}`, {
       headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` }
     });
 
     const userData = discordRes.data;
-    const username = userData.username;
-    const avatarHash = userData.avatar;
-    const avatarUrl = avatarHash 
-      ? `https://cdn.discordapp.com/avatars/${userData.id}/${avatarHash}.png` 
+    const baseUsername = userData.username;
+    const avatarUrl = userData.avatar 
+      ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=512` 
       : null;
 
-    // 2. Scan simultaneo di massa dei Social Media / Piattaforme Web tramite Username
-    const scanPromises = TARGET_SITES.map(async (site) => {
-      const targetUrl = site.url.replace('{}', username);
-      try {
-        const response = await axios.get(targetUrl, {
-          timeout: 4000,
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        });
-        if (response.status === 200) {
-          return { site: site.name, url: targetUrl, found: true };
-        }
-      } catch (err) {
-        // La maggior parte dei siti restituisce 404 se l'utente non esiste
-      }
-      return { site: site.name, url: targetUrl, found: false };
+    // 2. Generazione varianti username
+    const usernameVariations = generateUsernameVariations(baseUsername);
+
+    // 3. Scansione parallela ad alta velocità
+    const scanPromises = [];
+
+    TARGET_PLATFORMS.forEach(platform => {
+      // Per ogni piattaforma, testiamo sia l'username esatto sia le varianti
+      usernameVariations.forEach(uname => {
+        const targetUrl = platform.url.replace('{}', uname);
+        scanPromises.push(
+          axios.get(targetUrl, {
+            timeout: 3500,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+          }).then(response => {
+            if (response.status === 200) {
+              return { site: platform.name, usernameTested: uname, url: targetUrl, found: true };
+            }
+            return null;
+          }).catch(() => null)
+        );
+      });
     });
 
-    const scanResults = await Promise.all(scanPromises);
-    const foundProfiles = scanResults.filter(p => p.found);
+    const resultsRaw = await Promise.all(scanPromises);
+    // Filtraggio e rimozione duplicati
+    const foundProfiles = resultsRaw.filter(r => r !== null);
 
-    // 3. Generazione automatica dei link di Dorking
-    const googleDorks = [
-      { name: 'Ricerca Mention Generica', url: `https://www.google.com/search?q="${username}"` },
-      { name: 'Pastebin & Leak Dump', url: `https://www.google.com/search?q="${username}"+site:pastebin.com+OR+site:ghostbin.com` },
-      { name: 'Donazioni / Crowdfunding', url: `https://www.google.com/search?q="${username}"+site:paypal.me+OR+site:ko-fi.com+OR+site:buymeacoffee.com` },
-      { name: 'Forum & Community', url: `https://www.google.com/search?q="${username}"+inurl:forum+OR+inurl:viewtopic` }
+    // 4. Sezione Dorking Avanzato per Motori di Ricerca
+    const dorks = [
+      { name: 'Menzioni e Quote Direct', url: `https://www.google.com/search?q="${baseUsername}"` },
+      { name: 'Account Donazione / PayPal / Wallet', url: `https://www.google.com/search?q="${baseUsername}"+site:paypal.me+OR+site:ko-fi.com+OR+site:patreon.com+OR+site:buymeacoffee.com` },
+      { name: 'Leak / Pastebin / Text Dumps', url: `https://www.google.com/search?q="${baseUsername}"+site:pastebin.com+OR+site:rentry.co+OR+site:ghostbin.com` },
+      { name: 'Forum / Community Gaming', url: `https://www.google.com/search?q="${baseUsername}"+inurl:forum+OR+inurl:thread` },
+      { name: 'Documenti / PDF / Repository', url: `https://www.google.com/search?q="${baseUsername}"+filetype:pdf+OR+filetype:txt` }
     ];
 
-    // 4. Reverse Image Search Links per l'Avatar
-    const reverseImageLinks = avatarUrl ? {
-      googleLens: `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(avatarUrl)}`,
-      yandex: `https://yandex.com/images/search?rpt=imageview&url=${encodeURIComponent(avatarUrl)}`,
-      tineye: `https://tineye.com/search?url=${encodeURIComponent(avatarUrl)}`
-    } : null;
+    // 5. Motori di ricerca immagini inversa per l'Avatar
+    const reverseSearch = avatarUrl ? [
+      { name: 'Google Lens (Repertorio Visivo Completo)', url: `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(avatarUrl)}` },
+      { name: 'Yandex Images (Migliore per Visi/Profilazioni)', url: `https://yandex.com/images/search?rpt=imageview&url=${encodeURIComponent(avatarUrl)}` },
+      { name: 'TinEye (Mappatura Modifiche e Storico)', url: `https://tineye.com/search?url=${encodeURIComponent(avatarUrl)}` }
+    ] : [];
 
     return res.json({
-      discordInfo: {
+      discord: {
         id: userData.id,
-        username: username,
-        globalName: userData.global_name || 'Nessuno',
+        username: baseUsername,
+        globalName: userData.global_name || 'Non impostato',
         createdAt: getCreationDate(userData.id),
         avatarUrl: avatarUrl
       },
+      testedVariations: usernameVariations,
       detectedProfiles: foundProfiles,
-      googleDorks: googleDorks,
-      reverseImageSearch: reverseImageLinks
+      googleDorks: dorks,
+      reverseImageSearch: reverseSearch
     });
 
   } catch (err) {
     if (err.response && err.response.status === 404) {
-      return res.status(404).json({ error: 'ID Discord non trovato.' });
+      return res.status(404).json({ error: 'Utente Discord non trovato.' });
     }
-    return res.status(500).json({ error: 'Errore durante il recupero dati.' });
+    return res.status(500).json({ error: 'Errore durante la scansione OSINT.' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Tool OSINT avviato sulla porta ${PORT}`);
-});
+app.listen(PORT, () => console.log(`OSINT Scanner attivo sulla porta ${PORT}`));
